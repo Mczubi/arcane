@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"emperror.dev/errors"
@@ -303,7 +304,8 @@ func parseProjectEnvFileExistingInternal(path string, contextEnv EnvMap) (EnvMap
 // Stays on os.*: env files may be symlinks resolving outside any confinement
 // root (a supported setup), which acfs cannot follow.
 func ParseProjectEnvFile(path string, contextEnv EnvMap) (EnvMap, error) {
-	if _, err := os.Stat(path); err != nil {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
 		return nil, nil //nolint:nilerr // missing .env is not an error
 	}
 	return parseProjectEnvFileExistingInternal(path, contextEnv)
@@ -336,14 +338,14 @@ func WithTransientValidationEnvFile(ctx context.Context, projectPath string, eff
 	originalContent, readErr := os.ReadFile(filepath.Join(projectPath, ".env"))
 	originalExists := readErr == nil
 	if readErr != nil && !os.IsNotExist(readErr) {
-		if !errors.Is(readErr, os.ErrPermission) {
+		if !errors.Is(readErr, os.ErrPermission) && !errors.Is(readErr, syscall.EISDIR) {
 			return errors.WrapIf(readErr, "prepare env file for compose validation")
 		}
-		// The file exists but is permission-locked (e.g. chmod 000, foreign-owned).
+		// The path exists but is permission-locked (e.g. chmod 000, foreign-owned) or a directory.
 		// Its contents can't be verified or safely overwritten, so leave it
 		// untouched and validate against whatever's already on disk instead of
 		// aborting the whole update.
-		slog.Warn("skipping permission-locked .env file during compose validation; leaving it untouched", "projectPath", projectPath)
+		slog.Warn("skipping unreadable .env during compose validation; leaving it untouched", "projectPath", projectPath, "error", readErr)
 		if run == nil {
 			return nil
 		}
@@ -644,7 +646,7 @@ func ReadProjectEnvState(projectPath string) (ProjectEnvState, error) {
 	}
 
 	if effectiveUnreadable || gitSourceUnreadable || overrideUnreadable {
-		slog.Warn("skipping permission-locked project env file(s); leaving them untouched",
+		slog.Warn("skipping unreadable project env file(s); leaving them untouched",
 			"projectPath", projectPath,
 			"effectiveUnreadable", effectiveUnreadable,
 			"gitSourceUnreadable", gitSourceUnreadable,
@@ -732,7 +734,7 @@ func readOptionalProjectFileInternal(projectPath, fileName string) (content stri
 	if errors.Is(readErr, os.ErrNotExist) {
 		return "", false, false, nil
 	}
-	if errors.Is(readErr, os.ErrPermission) {
+	if errors.Is(readErr, os.ErrPermission) || errors.Is(readErr, syscall.EISDIR) {
 		return "", false, true, nil
 	}
 	return "", false, false, errors.WrapIff(readErr, "read %s", fileName)
