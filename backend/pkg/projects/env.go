@@ -692,13 +692,13 @@ func ReadProjectEnvState(projectPath string) (ProjectEnvState, error) {
 
 // WriteManagedEnvFile writes (or, for project.env, removes) one of the three
 // env-merge bookkeeping files — fileName must be EffectiveEnvFileName,
-// GitSourceEnvFileName, or OverrideEnvFileName. If the existing file is
-// permission-locked, the write is skipped and a warning logged instead: its
-// contents can't be verified, and a locked file is typically unwritable too,
-// so attempting the write would abort the whole caller.
+// GitSourceEnvFileName, or OverrideEnvFileName. If the existing path is
+// unreadable (permission-locked or a directory), the write is skipped and a
+// warning logged instead: its contents can't be verified, and such a path is
+// typically unwritable too, so attempting the write would abort the whole caller.
 func WriteManagedEnvFile(ctx context.Context, projectsDirectory, projectPath, fileName string, unreadable bool, content string) error {
 	if unreadable {
-		slog.Warn("skipping permission-locked project env file; leaving it untouched", "projectPath", projectPath, "file", fileName)
+		slog.Warn("skipping unreadable project env file; leaving it untouched", "projectPath", projectPath, "file", fileName)
 		return nil
 	}
 
@@ -718,11 +718,11 @@ func WriteManagedEnvFile(ctx context.Context, projectsDirectory, projectPath, fi
 }
 
 // readOptionalProjectFileInternal reads fileName from projectPath. A missing
-// file is reported via exists=false with no error. A permission error is
-// reported via unreadable=true with no error: the file is present but its
+// file is reported via exists=false with no error. A permission error or a
+// directory at the path is reported via unreadable=true with no error: its
 // contents cannot be verified, so callers must treat it as absent for merge
 // purposes and must not attempt to overwrite or remove it. Any other I/O
-// error (e.g. the path is a directory) is still returned as a hard failure.
+// error is still returned as a hard failure.
 // A project env file may itself be a symlink whose target lives outside the
 // project directory, so the read goes through os rather than the root-confined
 // API — the same deliberate exception the .env write path makes (#3556).
