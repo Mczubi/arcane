@@ -179,3 +179,25 @@ func TestProjectService_EnvDirectory_GitSync(t *testing.T) {
 	assert.Contains(t, string(composeBytes), "nginx:1.27-alpine")
 	assertEnvDirectoryIntactInternal(t, envDir)
 }
+
+func TestProjectService_EnvDirectory_EnvSaveFails(t *testing.T) {
+	svc, project, envDir, ctx := newEnvDirectoryProjectInternal(t, "env-dir-save")
+
+	_, err := svc.UpdateProject(ctx, project.ID, nil, nil, new("FOO=bar\n"), nil, common.User{ID: "u1", Username: "tester"})
+	require.ErrorContains(t, err, ".env is a directory")
+	assertEnvDirectoryIntactInternal(t, envDir)
+}
+
+func TestProjectService_OverrideEnvDirectory_EnvSaveFails(t *testing.T) {
+	svc, project, envDir, ctx := newEnvDirectoryProjectInternal(t, "override-dir-save")
+	require.NoError(t, os.RemoveAll(envDir))
+	require.NoError(t, os.WriteFile(filepath.Join(project.Path, ".env.git"), []byte("FOO=git\n"), 0o644))
+	overrideDir := filepath.Join(project.Path, "project.env")
+	require.NoError(t, os.Mkdir(overrideDir, 0o755))
+
+	_, err := svc.UpdateProject(ctx, project.ID, nil, nil, new("FOO=local\n"), nil, common.User{ID: "u1", Username: "tester"})
+	require.ErrorContains(t, err, "project.env is a directory")
+	info, err := os.Stat(overrideDir)
+	require.NoError(t, err)
+	assert.True(t, info.IsDir())
+}
