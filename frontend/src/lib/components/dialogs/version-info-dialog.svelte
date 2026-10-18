@@ -81,7 +81,7 @@
 	</div>
 {/snippet}
 
-<ResponsiveDialog {open} {onOpenChange} contentClass="sm:max-w-md">
+<ResponsiveDialog {open} {onOpenChange} contentClass="sm:max-w-xl">
 	{#snippet title()}
 		<div class="flex items-center gap-3">
 			<img src={logoUrl} alt="Arcane" class={developmentBranding ? 'size-10' : 'size-7'} />
