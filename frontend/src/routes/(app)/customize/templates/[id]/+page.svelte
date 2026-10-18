@@ -26,6 +26,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { templateService } from '#lib/services/template-service.js';
+	import { hasPermission } from '#lib/utils/auth.js';
 	import { formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { createForm } from '#lib/utils/settings.svelte.js';
 	import {
@@ -110,8 +111,12 @@
 				originalCompose = validated.composeContent;
 				originalEnv = validated.envContent ?? '';
 				await Promise.all([
-					queryClient.invalidateQueries({ queryKey: queryKeys.templates.content(template.id) }),
-					queryClient.invalidateQueries({ queryKey: queryKeys.templates.all })
+					queryClient.invalidateQueries({
+						queryKey: queryKeys.templates.content(template.id)
+					}),
+					queryClient.invalidateQueries({
+						queryKey: queryKeys.templates.all
+					})
 				]);
 				await refreshAll();
 			}
@@ -145,7 +150,7 @@
 		return data.allTemplates.find((t) => !t.isRemote && t.metadata?.remoteUrl === template.metadata?.remoteUrl);
 	});
 
-	const canDownload = $derived(template.isRemote && !localVersionOfRemote);
+	const canDownload = $derived(template.isRemote && !localVersionOfRemote && hasPermission('templates:create'));
 
 	async function handleDownload() {
 		if (status.isDownloading || !canDownload) return;
@@ -159,8 +164,12 @@
 						await goto(`/customize/templates/${downloadedTemplate.id}`, { replace: true });
 					} else {
 						await Promise.all([
-							queryClient.invalidateQueries({ queryKey: queryKeys.templates.content(template.id) }),
-							queryClient.invalidateQueries({ queryKey: queryKeys.templates.all })
+							queryClient.invalidateQueries({
+								queryKey: queryKeys.templates.content(template.id)
+							}),
+							queryClient.invalidateQueries({
+								queryKey: queryKeys.templates.all
+							})
 						]);
 						await refreshAll();
 					}
@@ -181,7 +190,9 @@
 		if (status.isDeleting) return;
 		openConfirmDialog({
 			title: m.common_delete_title({ resource: m.resource_template() }),
-			message: m.common_delete_confirm({ resource: `${m.resource_template()} "${template.name}"` }),
+			message: m.common_delete_confirm({
+				resource: `${m.resource_template()} "${template.name}"`
+			}),
 			confirm: {
 				label: m.templates_delete_template(),
 				destructive: true,
@@ -190,7 +201,11 @@
 					const operationResult = await tryCatch(
 						(async () => {
 							await templateService.deleteTemplate(template.id);
-							toast.success(m.common_delete_success({ resource: `${m.resource_template()} "${template.name}"` }));
+							toast.success(
+								m.common_delete_success({
+									resource: `${m.resource_template()} "${template.name}"`
+								})
+							);
 							await goto('/customize/templates');
 						})()
 					);
@@ -201,7 +216,9 @@
 						toast.error(
 							error instanceof Error
 								? error.message
-								: m.common_delete_failed({ resource: `${m.resource_template()} "${template.name}"` })
+								: m.common_delete_failed({
+										resource: `${m.resource_template()} "${template.name}"`
+									})
 						);
 						status.isDeleting = false;
 					}
@@ -255,7 +272,6 @@
 </script>
 
 {#if !template.isRemote}
-	<!-- Editor workspace for custom templates (same chrome as the create page) -->
 	<TemplateEditorWorkspace
 		bind:inputs
 		bind:validation
@@ -265,6 +281,7 @@
 		fileIdPrefix="templates:custom:{template.id}"
 		{globalVariableMap}
 		saving={status.saving}
+		lockNameAndDescription={data.templateData.isFolderTemplate}
 		onSubmit={handleSave}
 	>
 		{#snippet toolbarActions()}
@@ -360,35 +377,55 @@
 
 			<aside class="w-full shrink-0 space-y-6 lg:w-72 lg:border-l lg:border-border/50 lg:pl-8 xl:w-80">
 				<div class="space-y-3">
-					<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{m.common_overview()}</h3>
+					<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+						{m.common_overview()}
+					</h3>
 					<dl class="space-y-2 text-sm">
 						{#if template.registry?.name}
 							<div class="flex items-center justify-between gap-4">
-								<dt class="shrink-0 text-muted-foreground">{m.common_registry()}</dt>
-								<dd class="min-w-0 text-right font-medium break-words">{template.registry.name}</dd>
+								<dt class="shrink-0 text-muted-foreground">
+									{m.common_registry()}
+								</dt>
+								<dd class="min-w-0 text-right font-medium break-words">
+									{template.registry.name}
+								</dd>
 							</div>
 						{/if}
 						{#if template.metadata?.version}
 							<div class="flex items-center justify-between gap-4">
-								<dt class="shrink-0 text-muted-foreground">{m.common_version()}</dt>
-								<dd class="min-w-0 text-right font-medium break-words">{template.metadata.version}</dd>
+								<dt class="shrink-0 text-muted-foreground">
+									{m.common_version()}
+								</dt>
+								<dd class="min-w-0 text-right font-medium break-words">
+									{template.metadata.version}
+								</dd>
 							</div>
 						{/if}
 						{#if template.metadata?.author}
 							<div class="flex items-center justify-between gap-4">
-								<dt class="shrink-0 text-muted-foreground">{m.common_author()}</dt>
-								<dd class="min-w-0 text-right font-medium break-words">{template.metadata.author}</dd>
+								<dt class="shrink-0 text-muted-foreground">
+									{m.common_author()}
+								</dt>
+								<dd class="min-w-0 text-right font-medium break-words">
+									{template.metadata.author}
+								</dd>
 							</div>
 						{/if}
 						{#if template.metadata?.updatedAt}
 							<div class="flex items-center justify-between gap-4">
-								<dt class="shrink-0 text-muted-foreground">{m.common_updated()}</dt>
-								<dd class="min-w-0 text-right font-medium break-words">{formatDateTimeShort(template.metadata.updatedAt)}</dd>
+								<dt class="shrink-0 text-muted-foreground">
+									{m.common_updated()}
+								</dt>
+								<dd class="min-w-0 text-right font-medium break-words">
+									{formatDateTimeShort(template.metadata.updatedAt)}
+								</dd>
 							</div>
 						{/if}
 						{#if template.metadata?.documentationUrl}
 							<div class="flex items-center justify-between gap-4">
-								<dt class="shrink-0 text-muted-foreground">{m.common_documentation()}</dt>
+								<dt class="shrink-0 text-muted-foreground">
+									{m.common_documentation()}
+								</dt>
 								<dd class="min-w-0 text-right">
 									<a
 										href={template.metadata.documentationUrl}
@@ -429,11 +466,17 @@
 						<div class="space-y-2.5">
 							{#each envVars as envVar (envVar.key)}
 								<div class="min-w-0">
-									<div class="font-mono text-xs font-medium break-words select-all">{envVar.key}</div>
+									<div class="font-mono text-xs font-medium break-words select-all">
+										{envVar.key}
+									</div>
 									{#if envVar.value}
-										<div class="font-mono text-xs break-words text-muted-foreground select-all">{envVar.value}</div>
+										<div class="font-mono text-xs break-words text-muted-foreground select-all">
+											{envVar.value}
+										</div>
 									{:else}
-										<div class="text-xs text-muted-foreground italic">{m.common_no_default_value()}</div>
+										<div class="text-xs text-muted-foreground italic">
+											{m.common_no_default_value()}
+										</div>
 									{/if}
 								</div>
 							{/each}
@@ -443,7 +486,9 @@
 
 				{#if template.metadata?.tags && template.metadata.tags.length > 0}
 					<div class="space-y-3 border-t border-border/50 pt-6">
-						<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{m.common_tags()}</h3>
+						<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+							{m.common_tags()}
+						</h3>
 						<div class="flex flex-wrap gap-1">
 							{#each template.metadata.tags as tag (tag)}
 								<Badge variant="outline">{tag}</Badge>
