@@ -18,6 +18,7 @@ import (
 	"go.getarcane.app/updater/refs"
 
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/scheduler/jobcontext"
+	"github.com/getarcaneapp/arcane/backend/v2/pkg/utils/imageref"
 )
 
 // errNoFrozenPlan reports a run without a persisted frozen plan.
@@ -116,7 +117,7 @@ func (s *Service) FreezePending(ctx context.Context, run scheduler.Run, excluded
 		return ctx, err
 	}
 	records = slices.DeleteFunc(records, func(record updater.ImageUpdateRecord) bool {
-		return excluded[refs.NormalizeImageUpdateRef(record.ImageRef())] || excluded[record.ContainerID]
+		return !record.HasUpdate || excluded[refs.NormalizeImageUpdateRef(record.ImageRef())] || excluded[record.ContainerID]
 	})
 	failures := map[string]error{}
 	selected := make([]updater.ImageUpdateRecord, 0, len(records))
@@ -130,15 +131,17 @@ func (s *Service) FreezePending(ctx context.Context, run scheduler.Run, excluded
 		if listErr != nil {
 			return ctx, listErr
 		}
+		// Resolve each candidate's configured image once, not per record.
+		candidateRefs := make(map[string]string, len(listed.Items))
+		for _, candidate := range listed.Items {
+			candidateRefs[candidate.ID] = refs.NormalizeImageUpdateRef(imageref.ConfiguredImage(ctx, dockerClient, candidate))
+		}
 		for _, record := range records {
-			if !record.HasUpdate {
-				continue
-			}
 			for _, candidate := range listed.Items {
 				if excluded[candidate.ID] || (record.ContainerID != "" && record.ContainerID != candidate.ID) {
 					continue
 				}
-				if record.ContainerID == "" && refs.NormalizeImageUpdateRef(candidate.Image) != refs.NormalizeImageUpdateRef(record.ImageRef()) {
+				if record.ContainerID == "" && candidateRefs[candidate.ID] != refs.NormalizeImageUpdateRef(record.ImageRef()) {
 					continue
 				}
 				if deferred(record, candidate) {

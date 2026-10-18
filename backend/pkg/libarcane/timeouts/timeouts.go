@@ -28,10 +28,12 @@ const (
 	// per-environment concurrency slot before failing loudly instead of
 	// parking forever behind hung work.
 	DefaultActivitySlotWait = 2 * time.Minute
+	// DefaultAutoUpdateOperation bounds each updater engine Docker mutation and
+	// Compose project update. It must exceed DefaultDeployWait.
+	DefaultAutoUpdateOperation = 15 * time.Minute
 	// DefaultAutoUpdateApply bounds an entire auto-update (update-all) run.
-	// The updater engine's per-container docker operations carry no timeouts
-	// of their own, so this is the Arcane-side backstop that keeps a hung
-	// engine op from holding an activity slot indefinitely.
+	// It is a whole-run backstop on top of the per-operation bounds, keeping
+	// a long batch from holding an activity slot indefinitely.
 	DefaultAutoUpdateApply = 30 * time.Minute
 )
 

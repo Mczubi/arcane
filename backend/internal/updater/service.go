@@ -219,6 +219,7 @@ func NewUpdaterService(
 		UsedImageCollector:     updater.UsedImageCollectorFunc(service.CollectUsedImages),
 		LabelPolicy:            updater.DefaultLabelPolicy(),
 		SelfContainerID:        kit.Ternary(selfErr != nil, "", selfContainerID),
+		OperationTimeout:       timeouts.DefaultAutoUpdateOperation,
 		Logger:                 slog.Default(),
 	})
 	if err != nil {
@@ -294,7 +295,7 @@ func (s *UpdaterService) ApplyPending(ctx context.Context, options arcaneupdater
 }
 
 // applyBatch runs one update batch into out, records its events, and sends its notifications
-// as one batch. The engine's per-container docker operations carry no timeouts, so the run is capped.
+// as one batch, capped by a whole-run timeout.
 func (s *UpdaterService) applyBatch(ctx context.Context, options arcaneupdater.Options, out *arcaneupdater.Result) error {
 	batch := &containerUpdateBatch{}
 	ctx = context.WithValue(ctx, containerUpdateBatchContextKey{}, batch)
@@ -391,13 +392,21 @@ func (s *UpdaterService) applyScopedUpdates(ctx context.Context, options arcaneu
 		if listErr != nil {
 			return nil, fmt.Errorf("list containers: %w", listErr)
 		}
+		matches := func(summary container.Summary) bool {
+			return docker.ComposeServiceLabel(summary.Labels) != "" && wanted[strings.ToLower(strings.TrimSpace(docker.ComposeProjectLabel(summary.Labels)))]
+		}
+		if scope == "image" {
+			dockerClient, clientErr := s.DockerClient(ctx)
+			if clientErr != nil {
+				return nil, clientErr
+			}
+			matches = func(summary container.Summary) bool {
+				return wanted[summary.ImageID] || wanted[refs.NormalizeImageUpdateRef(imageref.ConfiguredImage(ctx, dockerClient, summary))]
+			}
+		}
 		var matched []string
 		for _, summary := range containers {
-			if kit.Ternary(
-				scope == "project",
-				docker.ComposeServiceLabel(summary.Labels) != "" && wanted[strings.ToLower(strings.TrimSpace(docker.ComposeProjectLabel(summary.Labels)))],
-				wanted[summary.ImageID] || wanted[refs.NormalizeImageUpdateRef(summary.Image)],
-			) {
+			if matches(summary) {
 				matched = append(matched, summary.ID)
 			}
 		}
@@ -703,7 +712,12 @@ func (s *UpdaterService) PendingImageUpdates(ctx context.Context) ([]updater.Ima
 	if err := s.deps.DB.WithContext(ctx).Model(&imageupdate.ImageUpdateRecord{}).Where("container_id <> ?", "").Limit(1).Count(&scopedCount).Error; err != nil {
 		return nil, err
 	}
-	running, err := func() ([]container.Summary, error) {
+	// Resolve each container's policy and normalized configured ref once, not per record.
+	type eligibleContainer struct {
+		id  string
+		ref string
+	}
+	eligible, err := func() ([]eligibleContainer, error) {
 		if scopedCount == 0 {
 			return nil, nil
 		}
@@ -715,23 +729,19 @@ func (s *UpdaterService) PendingImageUpdates(ctx context.Context) ([]updater.Ima
 		if listErr != nil {
 			return nil, listErr
 		}
-		return listed.Items, nil
+		matched := make([]eligibleContainer, 0, len(listed.Items))
+		for _, cnt := range listed.Items {
+			configured := imageref.ConfiguredImage(ctx, dockerClient, cnt)
+			resolved, policyErr := tagpolicy.Resolve(configured, updater.DefaultLabelPolicy().TagPolicy(cnt.Labels))
+			if policyErr != nil || resolved.Strategy == "tag" {
+				continue
+			}
+			matched = append(matched, eligibleContainer{id: cnt.ID, ref: refs.NormalizeImageUpdateRef(configured)})
+		}
+		return matched, nil
 	}()
 	if err != nil {
 		return nil, err
-	}
-	// Resolve each container's policy and normalized ref once, not per record.
-	type eligibleContainer struct {
-		id  string
-		ref string
-	}
-	eligible := make([]eligibleContainer, 0, len(running))
-	for _, cnt := range running {
-		resolved, policyErr := tagpolicy.Resolve(cnt.Image, updater.DefaultLabelPolicy().TagPolicy(cnt.Labels))
-		if policyErr != nil || resolved.Strategy == "tag" {
-			continue
-		}
-		eligible = append(eligible, eligibleContainer{id: cnt.ID, ref: refs.NormalizeImageUpdateRef(cnt.Image)})
 	}
 	converted := func(record imageupdate.ImageUpdateRecord, containerID string) updater.ImageUpdateRecord {
 		return updater.ImageUpdateRecord{
@@ -790,11 +800,13 @@ func (s *UpdaterService) ClearImageUpdateRecord(ctx context.Context, record upda
 		return err
 	}
 	for _, cnt := range listed.Items {
-		resolved, policyErr := tagpolicy.Resolve(cnt.Image, updater.DefaultLabelPolicy().TagPolicy(cnt.Labels))
+		// Untagged images list by ID, so an orphaned container matches by its configured image.
+		configured := imageref.ConfiguredImage(ctx, dockerClient, cnt)
+		resolved, policyErr := tagpolicy.Resolve(configured, updater.DefaultLabelPolicy().TagPolicy(cnt.Labels))
 		if policyErr != nil || resolved.Strategy == "tag" {
 			continue
 		}
-		if refs.NormalizeImageUpdateRef(cnt.Image) == refs.NormalizeImageUpdateRef(record.ImageRef()) && cnt.ImageID != target.ID {
+		if refs.NormalizeImageUpdateRef(configured) == refs.NormalizeImageUpdateRef(record.ImageRef()) && cnt.ImageID != target.ID {
 			return nil
 		}
 	}
