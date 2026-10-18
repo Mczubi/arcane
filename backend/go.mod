@@ -65,14 +65,14 @@ require (
 	github.com/subosito/gotenv v1.6.0
 	github.com/wneessen/go-mail v0.8.1
 	go.getarcane.app/acfs v0.6.3
-	go.getarcane.app/builds v0.4.5
+	go.getarcane.app/builds v0.4.6
 	go.getarcane.app/docker v0.1.2
 	go.getarcane.app/docker/compat v0.1.4
-	go.getarcane.app/docker/convert v0.3.5
+	go.getarcane.app/docker/convert v0.3.6
 	go.getarcane.app/kit v0.4.2
 	go.getarcane.app/streams v0.4.6
 	go.getarcane.app/sys/cgroup v0.2.5
-	go.getarcane.app/sys/crypto v0.3.1
+	go.getarcane.app/sys/crypto v0.3.2
 	go.getarcane.app/updater v0.11.9
 	go.opentelemetry.io/contrib/bridges/otelslog v0.21.0
 	go.opentelemetry.io/contrib/exporters/autoexport v0.72.0

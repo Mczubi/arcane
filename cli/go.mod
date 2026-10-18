@@ -27,7 +27,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/theupdateframework/go-tuf/v2 v2.4.2
 	go.getarcane.app/acfs v0.6.3
-	go.getarcane.app/builds v0.4.5
+	go.getarcane.app/builds v0.4.6
 	go.getarcane.app/docker v0.1.2
 	go.getarcane.app/kit v0.4.2
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
