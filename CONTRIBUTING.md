@@ -19,15 +19,8 @@ Thanks for helping make Arcane better! We've built a modern, streamlined develop
 
 - **Docker & Docker Compose**
 - **VS Code** based IDE (recommended for the best developer experience)
-- **[Vite+](https://viteplus.dev)** (`curl -fsSL https://vite.plus | bash`) — manages the Node toolchain, formatting, linting, and pre-commit hooks when working outside Docker
-- **[gci](https://github.com/daixiang0/gci) and [gofumpt](https://github.com/mvdan/gofumpt)** — required for Go import grouping and code formatting. Install both with Go:
-
-  ```bash
-  go install github.com/daixiang0/gci@latest
-  go install mvdan.cc/gofumpt@latest
-  ```
-
-  Make sure your Go binary directory is on `PATH`.
+- **[Vite+](https://viteplus.dev)** (`curl -fsSL https://vite.plus | bash`).
+- **[golangci-lint](https://golangci-lint.run/docs/welcome/install/) v2** — runs Go linting and formatting.
 
 > **💡 Working Directory**: Unless otherwise specified, all commands in this guide should be run from the project root directory (`arcane/`).
 

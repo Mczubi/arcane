@@ -16,14 +16,13 @@
 		maxVisible = 3,
 		hideExposed = false,
 		wrap = true
-	} = $props<{
+	}: {
 		ports?: PortBadgePort[];
 		collapsible?: boolean;
 		maxVisible?: number;
 		hideExposed?: boolean;
-		// In tables, set false so badges stay on one line (wrapping grows the row height).
 		wrap?: boolean;
-	}>();
+	} = $props();
 
 	let expanded = $state(false);
 
@@ -138,7 +137,9 @@
 						</p>
 					{/each}
 					<p class="mt-1 text-xs text-muted-foreground">
-						{m.port_link_base_server_url_hint({ url: toPortHref(p.hostPort!, baseServerUrl) })}
+						{m.port_link_base_server_url_hint({
+							url: toPortHref(p.hostPort!, baseServerUrl)
+						})}
 					</p>
 				</ArcaneTooltip.Content>
 			</ArcaneTooltip.Root>
@@ -173,7 +174,11 @@
 				</ArcaneTooltip.Trigger>
 				<ArcaneTooltip.Content>
 					<p class="text-xs">
-						{expanded ? m.containers_show_fewer_ports() : m.containers_show_more_ports({ count: hiddenCount })}
+						{expanded
+							? m.containers_show_fewer_ports()
+							: m.containers_show_more_ports({
+									count: hiddenCount
+								})}
 					</p>
 				</ArcaneTooltip.Content>
 			</ArcaneTooltip.Root>
