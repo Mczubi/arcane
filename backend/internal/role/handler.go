@@ -132,6 +132,8 @@ func (h *RoleHandler) UpdateRole(ctx context.Context, input *UpdateRoleInput) (*
 			return nil, huma.Error409Conflict("role name already in use")
 		case errors.Is(err, common.ErrUnknownPermission):
 			return nil, huma.Error400BadRequest(err.Error())
+		case errors.Is(err, common.ErrNoGlobalAdminRemains):
+			return nil, huma.Error409Conflict(err.Error())
 		}
 		return nil, huma.Error500InternalServerError("failed to update role: " + err.Error())
 	}
@@ -180,7 +182,7 @@ func (h *RoleHandler) SetUserRoleAssignments(ctx context.Context, input *SetUser
 	for i, a := range input.Body.Assignments {
 		desired[i] = UserRoleAssignment{RoleID: a.RoleID, EnvironmentID: a.EnvironmentID}
 	}
-	if err := h.roleService.SetUserAssignments(ctx, input.UserID, desired); err != nil {
+	if err := h.roleService.ReplaceUserAssignments(ctx, input.UserID, RoleAssignmentSourceManual, desired); err != nil {
 		switch {
 		case errors.Is(err, common.ErrUserNotFound):
 			return nil, huma.Error404NotFound(err.Error())
