@@ -1358,6 +1358,7 @@ func TestSettingsService_SwarmFeatureDefaultsOffAndPersists(t *testing.T) {
 }
 
 func TestSettingsServiceEncryptsSensitiveSettingsAtRest(t *testing.T) {
+	t.Setenv("DEPOT_TOKEN", "")
 	ctx := t.Context()
 	db := setupSettingsTestDB(t)
 	svc, err := newSettingsServiceForTest(t, ctx, db)
