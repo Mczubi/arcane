@@ -34,6 +34,12 @@ func TestPruneVolumesSkipsBackupVolume(t *testing.T) {
 			_, _ = fmt.Fprint(w, `{"Volumes":[`+
 				`{"Name":"orphan","Driver":"local","UsageData":{"RefCount":0,"Size":100}},`+
 				`{"Name":"arcane-backups","Driver":"local","UsageData":{"RefCount":0,"Size":200}}]}`)
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/containers/json"):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = fmt.Fprint(w, `[]`)
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/volumes/"):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = fmt.Fprint(w, `{"Name":"`+path.Base(r.URL.Path)+`","Driver":"local"}`)
 		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/volumes/"):
 			mu.Lock()
 			deleted = append(deleted, path.Base(r.URL.Path))
