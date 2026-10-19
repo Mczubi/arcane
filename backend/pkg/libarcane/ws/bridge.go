@@ -69,13 +69,13 @@ func ForwardLogJSONBatched(ctx context.Context, hub *Hub, logs <-chan LogMessage
 
 	buf := make([]LogMessage, 0, maxBatch)
 
-	flush := func() {
+	flush := func(publishCtx context.Context) {
 		if len(buf) == 0 {
 			return
 		}
 		b, err := json.Marshal(buf)
 		if err == nil {
-			hub.Publish(ctx, b)
+			hub.Publish(publishCtx, b)
 		}
 		buf = buf[:0]
 	}
@@ -83,11 +83,11 @@ func ForwardLogJSONBatched(ctx context.Context, hub *Hub, logs <-chan LogMessage
 	for {
 		select {
 		case <-ctx.Done():
-			flush()
+			flush(context.WithoutCancel(ctx))
 			return
 		case m, ok := <-logs:
 			if !ok {
-				flush()
+				flush(ctx)
 				return
 			}
 			if m.Timestamp == "" {
@@ -95,10 +95,10 @@ func ForwardLogJSONBatched(ctx context.Context, hub *Hub, logs <-chan LogMessage
 			}
 			buf = append(buf, m)
 			if len(buf) >= maxBatch {
-				flush()
+				flush(ctx)
 			}
 		case <-ticker.C:
-			flush()
+			flush(ctx)
 		}
 	}
 }
