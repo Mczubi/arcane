@@ -166,10 +166,17 @@ func Initialize(ctx context.Context, databaseURL string, options MigrationOption
 	if err != nil {
 		return nil, fmt.Errorf("failed to register database instrumentation: %w", err)
 	}
-	sqlDB.SetMaxIdleConns(kit.Ternary(dbProvider == dbProviderPostgres, 15, 5))
-	sqlDB.SetMaxOpenConns(kit.Ternary(dbProvider == dbProviderPostgres, 50, 20))
-	sqlDB.SetConnMaxLifetime(5 * time.Minute)
-	sqlDB.SetConnMaxIdleTime(3 * time.Minute)
+	if dbProvider == dbProviderPostgres {
+		sqlDB.SetMaxIdleConns(15)
+		sqlDB.SetMaxOpenConns(50)
+		sqlDB.SetConnMaxLifetime(5 * time.Minute)
+		sqlDB.SetConnMaxIdleTime(3 * time.Minute)
+	} else {
+		sqlDB.SetMaxIdleConns(10)
+		sqlDB.SetMaxOpenConns(10)
+		sqlDB.SetConnMaxLifetime(0)
+		sqlDB.SetConnMaxIdleTime(0)
+	}
 	metrics.ReportDBStatsMetrics(sqlDB)
 	if migrationErr := migrateDatabase(ctx, sqlDB, dbProvider, options, latestMigrationVersion); migrationErr != nil {
 		slog.ErrorContext(ctx, "Failed to run migrations", "error", migrationErr)
@@ -462,6 +469,9 @@ func ParseSQLiteConnectionString(connString string) (string, error) {
 	if !slices.Contains([]string{"ro", "memory"}, qs.Get("mode")) && !strings.HasPrefix(cmp.Or(connStringUrl.Opaque, connStringUrl.Path), ":memory:") {
 		if !sqliteutil.HasPragma(qs, "journal_mode") {
 			qs.Add("_pragma", "journal_mode(WAL)")
+		}
+		if !sqliteutil.HasPragma(qs, "synchronous") {
+			qs.Add("_pragma", "synchronous(NORMAL)")
 		}
 		if qs.Get("_txlock") == "" {
 			qs.Set("_txlock", "immediate")

@@ -501,7 +501,10 @@ func (h *ProjectHandler) getProjectDetailsWithOptions(ctx context.Context, input
 
 	details, err := h.projectService.GetProjectDetails(ctx, input.ProjectID, opts)
 	if err != nil {
-		return nil, huma.Error404NotFound("Failed to get project details: " + err.Error())
+		if apiErr := common.ToAPIError(err); apiErr.HTTPStatus() != http.StatusInternalServerError {
+			return nil, huma.NewError(apiErr.HTTPStatus(), apiErr.Message)
+		}
+		return nil, huma.Error500InternalServerError("Failed to get project details: " + err.Error())
 	}
 
 	return &handlerutil.Out[project.Details]{

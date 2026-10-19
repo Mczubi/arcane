@@ -1482,19 +1482,19 @@ func TestSQLiteDSN_ConcurrencyDefaults(t *testing.T) {
 		{
 			name:    "defaults added",
 			input:   "file:arcane.db",
-			pragmas: []string{"foreign_keys(1)", "busy_timeout(10000)", "journal_mode(WAL)"},
+			pragmas: []string{"foreign_keys(1)", "busy_timeout(10000)", "journal_mode(WAL)", "synchronous(NORMAL)"},
 			txlock:  "immediate",
 		},
 		{
 			name:    "explicit values kept",
 			input:   "file:arcane.db?_journal_mode=DELETE&_timeout=500&_txlock=deferred",
-			pragmas: []string{"foreign_keys(1)", "busy_timeout(500)", "journal_mode(DELETE)"},
+			pragmas: []string{"foreign_keys(1)", "busy_timeout(500)", "journal_mode(DELETE)", "synchronous(NORMAL)"},
 			txlock:  "deferred",
 		},
 		{
 			name:    "explicit pragmas kept",
 			input:   "file:arcane.db?_pragma=journal_mode(TRUNCATE)&_pragma=busy_timeout(2000)",
-			pragmas: []string{"foreign_keys(1)", "busy_timeout(2000)", "journal_mode(TRUNCATE)"},
+			pragmas: []string{"foreign_keys(1)", "busy_timeout(2000)", "journal_mode(TRUNCATE)", "synchronous(NORMAL)"},
 			txlock:  "immediate",
 		},
 		{

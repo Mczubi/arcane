@@ -71,6 +71,7 @@ import (
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/projects"
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/utils"
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/utils/concurrency"
+	"github.com/getarcaneapp/arcane/backend/v2/pkg/utils/dbutil"
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/utils/handlerutil"
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/utils/httpx"
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/utils/iconcatalog"
@@ -504,13 +505,17 @@ func (s *ProjectService) GetProjectRelativePath(ctx context.Context, projectPath
 func (s *ProjectService) GetProjectFromDatabaseByID(ctx context.Context, id string) (*Project, error) {
 	projectModel, found, err := s.FindProjectByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return nil, errors.New("request canceled or timed out")
+		switch {
+		case errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded):
+			return nil, common.Classify(common.ErrTimeout, fmt.Errorf("request canceled or timed out: %w", err))
+		case dbutil.IsRetryableWriteError(err):
+			return nil, common.Classify(common.ErrUnavailable, fmt.Errorf("failed to get project: %w", err))
+		default:
+			return nil, fmt.Errorf("failed to get project: %w", err)
 		}
-		return nil, fmt.Errorf("failed to get project: %w", err)
 	}
 	if !found {
-		return nil, errors.New("project not found")
+		return nil, common.Classify(common.ErrNotFound, errors.New("project not found"))
 	}
 	return projectModel, nil
 }
