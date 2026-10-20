@@ -1,4 +1,5 @@
 import { browser } from '$app/env';
+import { invalidate } from '$app/navigation';
 import { navigating, page } from '$app/state';
 import { error, redirect } from '@sveltejs/kit';
 import { QueryClient } from '@tanstack/svelte-query';
@@ -7,6 +8,7 @@ import { queryKeys } from '#lib/query/query-keys.js';
 import { isSessionCancelledError } from '#lib/services/api-service.js';
 import { authService } from '#lib/services/auth-service.js';
 import { environmentManagementService } from '#lib/services/env-mgmt-service.js';
+import { podmanService } from '#lib/services/podman-service.js';
 import { roleService } from '#lib/services/role-service.js';
 import { settingsService } from '#lib/services/settings-service.js';
 import { swarmService } from '#lib/services/swarm-service.js';
@@ -19,6 +21,7 @@ import userStore from '#lib/stores/user-store.svelte.js';
 import { versionStore } from '#lib/stores/version.store.svelte.js';
 import type { PermissionsManifest, User } from '#lib/types/auth.js';
 import type { Environment } from '#lib/types/environment.js';
+import type { PodmanStatus } from '#lib/types/podman.js';
 import type { AppVersionInformation, Settings } from '#lib/types/settings.js';
 import { isAuthRejectionError } from '#lib/utils/api.js';
 import { getAuthRedirectPath, shownEnvironmentForRoute, userHasPermission } from '#lib/utils/auth.js';
@@ -55,6 +58,9 @@ let telemetryAwaited = false;
 
 // Navigations reuse root data for this long; a refresh of the page on screen always refetches.
 const ROOT_STALE_TIME = 30_000;
+const SECONDARY_DISCOVERY_TIMEOUT = 1_500;
+const PODMAN_STATUS_DEPENDENCY = 'app:podman-status';
+const slowPodmanStatuses = new Map<string, PodmanStatus>();
 // Query results last pushed into the stores, so a cached repeat never overwrites newer local or streamed state.
 let appliedUser: User | undefined;
 let appliedEnvironments: Environment[] | undefined;
@@ -76,7 +82,8 @@ export const load: LayoutLoad = async (event) => {
 	}
 };
 
-async function loadRoot({ url }: Parameters<LayoutLoad>[0], releaseSelection: (() => void) | undefined) {
+async function loadRoot({ url, depends }: Parameters<LayoutLoad>[0], releaseSelection: (() => void) | undefined) {
+	depends(PODMAN_STATUS_DEPENDENCY);
 	// Logout must not wait on, or be triggered by, authenticated requests; preloading runs this too.
 	if (url.pathname === '/logout') {
 		return {
@@ -86,7 +93,9 @@ async function loadRoot({ url }: Parameters<LayoutLoad>[0], releaseSelection: ((
 			permissionsManifestLoadFailed: false,
 			versionInformation: versionStore.current ?? toAppVersionInformation({}),
 			queryClient,
-			swarmEnabled: undefined
+			swarmEnabled: undefined,
+			podmanStatus: null,
+			podmanStatuses: {}
 		};
 	}
 
@@ -139,6 +148,8 @@ async function loadRoot({ url }: Parameters<LayoutLoad>[0], releaseSelection: ((
 
 	let settings = null;
 	let swarmEnabled: boolean | undefined;
+	let podmanStatus: PodmanStatus | null = null;
+	let podmanStatuses: Record<string, PodmanStatus> = {};
 	let permissionsManifest: PermissionsManifest | null = null;
 	let permissionsManifestLoadFailed = false;
 	if (user) {
@@ -227,9 +238,46 @@ async function loadRoot({ url }: Parameters<LayoutLoad>[0], releaseSelection: ((
 					})
 				)
 			: Promise.resolve(null);
-		const [loadedSettings, loadedSwarmStatus, loadedPermissionsManifest] = await Promise.all([
+		const podmanEnvironmentIds = [...new Set([currentEnvironmentId, ...environmentStore.shown.map((env) => env.id)])].filter(
+			(id) => userHasPermission(user, 'podman:read', id)
+		);
+		const podmanStatusRequest = Promise.all(
+			podmanEnvironmentIds.map(async (id) => {
+				const request = dataOrNull(
+					queryClient.query({
+						...rootQuery,
+						queryKey: queryKeys.podman.status(id),
+						queryFn: () => podmanService.getStatus(id, { suppressAccessDeniedToast: true })
+					})
+				);
+				if (id === currentEnvironmentId) return [id, await request] as const;
+				const known = slowPodmanStatuses.get(id);
+				if (known) {
+					void request.then((refreshed) => {
+						if (JSON.stringify(refreshed) === JSON.stringify(known)) return;
+						if (refreshed?.detected) slowPodmanStatuses.set(id, refreshed);
+						else slowPodmanStatuses.delete(id);
+						void invalidate(PODMAN_STATUS_DEPENDENCY);
+					});
+					return [id, known] as const;
+				}
+				const status = await Promise.race([
+					request,
+					new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), SECONDARY_DISCOVERY_TIMEOUT))
+				]);
+				if (status !== 'pending') return [id, status] as const;
+				void request.then((discovered) => {
+					if (!discovered?.detected) return;
+					slowPodmanStatuses.set(id, discovered);
+					void invalidate(PODMAN_STATUS_DEPENDENCY);
+				});
+				return [id, null] as const;
+			})
+		);
+		const [loadedSettings, loadedSwarmStatus, loadedPodmanStatuses, loadedPermissionsManifest] = await Promise.all([
 			settingsRequest,
 			swarmStatusRequest,
+			podmanStatusRequest,
 			permissionsManifestRequest
 		]);
 		// Keep recovery/settings pages reachable while a selected agent is offline.
@@ -244,6 +292,10 @@ async function loadRoot({ url }: Parameters<LayoutLoad>[0], releaseSelection: ((
 			));
 		await featuresRequest;
 		swarmEnabled = loadedSwarmStatus?.enabled;
+		podmanStatuses = Object.fromEntries(
+			loadedPodmanStatuses.filter((entry): entry is readonly [string, PodmanStatus] => entry[1]?.detected === true)
+		);
+		podmanStatus = podmanStatuses[currentEnvironmentId] ?? null;
 		permissionsManifest = loadedPermissionsManifest;
 		permissionsManifestLoadFailed = loadedPermissionsManifest === null;
 	} else {
@@ -306,6 +358,8 @@ async function loadRoot({ url }: Parameters<LayoutLoad>[0], releaseSelection: ((
 		permissionsManifestLoadFailed,
 		versionInformation,
 		queryClient,
-		swarmEnabled
+		swarmEnabled,
+		podmanStatus,
+		podmanStatuses
 	};
 }

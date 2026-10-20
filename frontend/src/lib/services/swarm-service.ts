@@ -33,10 +33,10 @@ import type {
 	SwarmJoinTokensResponse,
 	SwarmRotateJoinTokensRequest,
 	SwarmUpdateRequest,
-	SwarmConfigSummary,
-	SwarmSecretSummary,
-	SwarmConfigCreateRequest,
-	SwarmSecretCreateRequest,
+	SwarmKvCreateRequest,
+	SwarmKvKind,
+	SwarmKvSummary,
+	SwarmKvUpdateRequest,
 	SwarmJoinCandidate,
 	SwarmJoinEnvironmentsRequest,
 	SwarmJoinEnvironmentsResponse
@@ -272,34 +272,35 @@ class SwarmService extends BaseAPIService {
 		await this.handleResponse(this.api.put(`/environments/${envId}/swarm/spec`, request));
 	}
 
-	async getConfigs(): Promise<SwarmConfigSummary[]> {
+	async getKvItems(kind: SwarmKvKind, options?: SearchPaginationSortRequest): Promise<Paginated<SwarmKvSummary>> {
 		const envId = await environmentStore.getCurrentEnvironmentId();
-		return this.handleResponse(this.api.get(`/environments/${envId}/swarm/configs`));
+		const res = await this.api.get(`/environments/${envId}/swarm/${kind}`, { params: transformPaginationParams(options) });
+		return res.data;
 	}
 
-	async createConfig(request: SwarmConfigCreateRequest): Promise<SwarmConfigSummary> {
-		const envId = await environmentStore.getCurrentEnvironmentId();
-		return this.handleResponse(this.api.post(`/environments/${envId}/swarm/configs`, request));
+	async getKvItem(kind: SwarmKvKind, id: string, environmentId?: string): Promise<SwarmKvSummary> {
+		const envId = environmentId ?? (await environmentStore.getCurrentEnvironmentId());
+		return this.handleResponse(this.api.get(`/environments/${envId}/swarm/${kind}/${encodeURIComponent(id)}`));
 	}
 
-	async removeConfig(configId: string): Promise<void> {
-		const envId = await environmentStore.getCurrentEnvironmentId();
-		await this.handleResponse(this.api.delete(`/environments/${envId}/swarm/configs/${configId}`));
+	async createKvItem(kind: SwarmKvKind, request: SwarmKvCreateRequest, environmentId?: string): Promise<SwarmKvSummary> {
+		const envId = environmentId ?? (await environmentStore.getCurrentEnvironmentId());
+		return this.handleResponse(this.api.post(`/environments/${envId}/swarm/${kind}`, request));
 	}
 
-	async getSecrets(): Promise<SwarmSecretSummary[]> {
-		const envId = await environmentStore.getCurrentEnvironmentId();
-		return this.handleResponse(this.api.get(`/environments/${envId}/swarm/secrets`));
+	async updateKvItem(
+		kind: SwarmKvKind,
+		id: string,
+		request: SwarmKvUpdateRequest,
+		environmentId?: string
+	): Promise<SwarmKvSummary> {
+		const envId = environmentId ?? (await environmentStore.getCurrentEnvironmentId());
+		return this.handleResponse(this.api.put(`/environments/${envId}/swarm/${kind}/${encodeURIComponent(id)}`, request));
 	}
 
-	async createSecret(request: SwarmSecretCreateRequest): Promise<SwarmSecretSummary> {
+	async removeKvItem(kind: SwarmKvKind, id: string): Promise<void> {
 		const envId = await environmentStore.getCurrentEnvironmentId();
-		return this.handleResponse(this.api.post(`/environments/${envId}/swarm/secrets`, request));
-	}
-
-	async removeSecret(secretId: string): Promise<void> {
-		const envId = await environmentStore.getCurrentEnvironmentId();
-		await this.handleResponse(this.api.delete(`/environments/${envId}/swarm/secrets/${secretId}`));
+		await this.handleResponse(this.api.delete(`/environments/${envId}/swarm/${kind}/${encodeURIComponent(id)}`));
 	}
 }
 

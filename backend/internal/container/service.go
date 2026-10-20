@@ -45,9 +45,11 @@ import (
 	"github.com/getarcaneapp/arcane/backend/v2/internal/event"
 	"github.com/getarcaneapp/arcane/backend/v2/internal/image"
 	"github.com/getarcaneapp/arcane/backend/v2/internal/kv"
+	"github.com/getarcaneapp/arcane/backend/v2/internal/podman"
 	"github.com/getarcaneapp/arcane/backend/v2/internal/project"
 	"github.com/getarcaneapp/arcane/backend/v2/internal/settings"
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/libarcane"
+	libpodman "github.com/getarcaneapp/arcane/backend/v2/pkg/libarcane/podman"
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/libarcane/timeouts"
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/pagination"
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/projects"
@@ -76,6 +78,7 @@ type ContainerService struct {
 	settingsService *settings.SettingsService
 	projectService  *project.ProjectService
 	kvService       *kv.KVService
+	podmanService   *podman.Service
 	iconMetaCache   *hot.HotCache[string, projects.ArcaneComposeMetadata]
 	stats           *stats.Service
 	// opLock serializes mutating operations on the same container.
@@ -118,6 +121,7 @@ func NewContainerService(
 	settingsService *settings.SettingsService,
 	projectService *project.ProjectService,
 	kvService *kv.KVService,
+	podmanService *podman.Service,
 ) *ContainerService {
 	return &ContainerService{
 		eventService:    eventService,
@@ -126,6 +130,7 @@ func NewContainerService(
 		settingsService: settingsService,
 		projectService:  projectService,
 		kvService:       kvService,
+		podmanService:   podmanService,
 		iconMetaCache: hot.NewHotCache[string, projects.ArcaneComposeMetadata](hot.LRU, 1024).
 			WithTTL(containerIconMetadataTTL).
 			WithJanitor().
@@ -409,6 +414,9 @@ func (s *ContainerService) StartContainer(ctx context.Context, containerID strin
 		action:    "start",
 		eventType: event.EventTypeContainerStart,
 		runContainerAction: func(ctx context.Context) error {
+			if handled, unitErr := s.podmanService.ContainerUnitAction(ctx, containerID, libpodman.Systemd.Start); handled {
+				return unitErr
+			}
 			_, err := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.ContainerStartResult, error) {
 				return dockerClient.ContainerStart(ctx, containerID, client.ContainerStartOptions{})
 			})
@@ -422,6 +430,9 @@ func (s *ContainerService) StopContainer(ctx context.Context, containerID string
 		action:    "stop",
 		eventType: event.EventTypeContainerStop,
 		runContainerAction: func(ctx context.Context) error {
+			if handled, unitErr := s.podmanService.ContainerUnitAction(ctx, containerID, libpodman.Systemd.Stop); handled {
+				return unitErr
+			}
 			return s.stopContainer(ctx, containerID)
 		},
 	})
@@ -432,6 +443,9 @@ func (s *ContainerService) RestartContainer(ctx context.Context, containerID str
 		action:    "restart",
 		eventType: event.EventTypeContainerRestart,
 		runContainerAction: func(ctx context.Context) error {
+			if handled, unitErr := s.podmanService.ContainerUnitAction(ctx, containerID, libpodman.Systemd.Restart); handled {
+				return unitErr
+			}
 			dockerClient, err := s.dockerService.GetClient(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to connect to Docker: %w", err)
@@ -556,6 +570,9 @@ func (s *ContainerService) RedeployContainer(ctx context.Context, containerID st
 			"step":   "validate_config",
 		})
 		return "", fmt.Errorf("failed to redeploy container: %w", err)
+	}
+	if guardErr := s.podmanService.GuardQuadletManaged(ctx, containerInfo.Config.Labels); guardErr != nil {
+		return "", guardErr
 	}
 
 	containerName := strings.TrimPrefix(containerInfo.Name, "/")
@@ -686,6 +703,20 @@ func (s *ContainerService) recreateContainer(
 	if err != nil {
 		return "", fmt.Errorf("preserve volumes of container %s: %w", containerName, err)
 	}
+	engine, err := s.dockerService.Engine(ctx)
+	if err != nil {
+		return "", fmt.Errorf("detect container engine for %s: %w", containerName, err)
+	}
+	engine.SanitizeRecreateHostConfig(&restoreHostConfig)
+	if engine.SanitizeRecreateHostConfig(&createHostConfig) {
+		slog.InfoContext(ctx, "Stripped unsupported host config field for recreate",
+			"container", containerName,
+			"containerId", containerInfo.ID,
+			"engine", engine.Name,
+			"cgroupVersion", engine.CgroupVersion,
+			"field", "memorySwappiness",
+		)
+	}
 
 	defer s.eventService.BeginDockerResourceSuppressionWindow("container", containerInfo.ID, containerName)()
 	backupName := fmt.Sprintf("%s%s%d", cmp.Or(containerName, "arcane-redeploy-"+containerInfo.ID[:min(12, len(containerInfo.ID))]), redeployBackupInfix, time.Now().Unix())
@@ -694,7 +725,7 @@ func (s *ContainerService) recreateContainer(
 	// A returned error means the workload is down and is joined into the start error.
 	restoreAutoRemoveOriginal := func(ctx context.Context) error {
 		originalConfig := *containerInfo.Config
-		if len(containerInfo.ID) >= 12 && originalConfig.Hostname == containerInfo.ID[:12] {
+		if originalConfig.Hostname == containerInfo.ID[:min(12, len(containerInfo.ID))] {
 			originalConfig.Hostname = "" // keep: copying Docker's 24-field container.Config to clear one field is unreadable
 		}
 
@@ -752,7 +783,7 @@ func (s *ContainerService) recreateContainer(
 		}
 	}
 
-	if len(containerInfo.ID) >= 12 && newConfig.Hostname == containerInfo.ID[:12] {
+	if newConfig.Hostname == containerInfo.ID[:min(12, len(containerInfo.ID))] {
 		newConfig.Hostname = "" // keep: copying Docker's 24-field container.Config to clear one field is unreadable
 	}
 
@@ -1147,6 +1178,9 @@ func (s *ContainerService) EditContainer(ctx context.Context, containerID string
 	if localProject := docker.ComposeProjectLabel(containerInfo.Config.Labels); localProject != "" {
 		return "", fmt.Errorf("compose project %s: %w", localProject, common.ErrContainerComposeManaged)
 	}
+	if guardErr := s.podmanService.GuardQuadletManaged(ctx, containerInfo.Config.Labels); guardErr != nil {
+		return "", guardErr
+	}
 
 	currentContainerID, currentContainerErr := cgroup.CurrentContainerID()
 	if labels.ShouldDisableArcaneServerRedeploy(containerInfo.Config.Labels, containerInfo.ID, currentContainerID, currentContainerErr) {
@@ -1307,18 +1341,23 @@ func (s *ContainerService) DeleteContainer(ctx context.Context, containerID stri
 	}
 	defer unlock()
 
+	containerJSON, inspectErr := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.ContainerInspectResult, error) {
+		return compat.ContainerInspectWithCompatibility(ctx, dockerClient, containerID, client.ContainerInspectOptions{})
+	})
+	if inspectErr != nil {
+		return fmt.Errorf("failed to inspect container before removal: %w", inspectErr)
+	}
+	if guardErr := s.podmanService.GuardQuadletManaged(ctx, kit.FromPtr(containerJSON.Container.Config).Labels); guardErr != nil {
+		return guardErr
+	}
+
 	// Get container mounts before deletion if we need to remove volumes
 	var volumesToRemove []string
 	if removeVolumes {
-		containerJSON, inspectErr := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.ContainerInspectResult, error) {
-			return compat.ContainerInspectWithCompatibility(ctx, dockerClient, containerID, client.ContainerInspectOptions{})
-		})
-		if inspectErr == nil {
-			for _, mount := range containerJSON.Container.Mounts {
-				// Only collect named volumes (not bind mounts or tmpfs)
-				if mount.Type == "volume" && mount.Name != "" {
-					volumesToRemove = append(volumesToRemove, mount.Name)
-				}
+		for _, mount := range containerJSON.Container.Mounts {
+			// Only collect named volumes (not bind mounts or tmpfs)
+			if mount.Type == "volume" && mount.Name != "" {
+				volumesToRemove = append(volumesToRemove, mount.Name)
 			}
 		}
 	}
