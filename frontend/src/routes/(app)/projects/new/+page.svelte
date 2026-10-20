@@ -170,7 +170,7 @@
 	const validationState = $derived(
 		getTemplateEditorValidationState(
 			validation.composeValidationReady,
-			validation.envValidationReady,
+			validation.envValidationReady || inputs.envContent.value === formData.envContent,
 			validation.composeHasErrors,
 			validation.envHasErrors
 		)
@@ -373,7 +373,7 @@
 					tooltipTitle={m.compose_project_name_tooltip_title()}
 					tooltipDescription={m.compose_project_name_tooltip_description()}
 					tooltipExample={m.compose_project_name_tooltip_example()}
-					showCreateButton={!hasEditorErrors && canCreateProject}
+					showCreateButton={canCreateProject}
 					createDisabled={!effectiveName || !inputs.composeContent.value || hasEditorErrors || createMenuBusy}
 					createLoading={ui.saving}
 					createLabel={m.compose_create_project()}
