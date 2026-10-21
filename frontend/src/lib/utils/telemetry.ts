@@ -1,6 +1,6 @@
 import type { NavigationType } from '$app/navigation';
 import type { Context, Counter, Histogram, Span } from '@opentelemetry/api';
-import type { LogRecord } from '@opentelemetry/api-logs';
+import type { LogRecord } from '@opentelemetry/api';
 import type { Resource } from '@opentelemetry/resources';
 import type { Metric } from 'web-vitals';
 
@@ -31,9 +31,10 @@ let emitErrorLog: ((record: LogRecord) => void) | undefined;
 
 const initializers: Record<Signal, (resource: Resource) => Promise<void>> = {
 	traces: async (resource) => {
-		const [api, sdk, exporter, instrumentation, documentLoad, fetch] = await Promise.all([
+		const [api, core, sdk, exporter, instrumentation, documentLoad, fetch] = await Promise.all([
 			import('@opentelemetry/api'),
-			import('@opentelemetry/sdk-trace-web'),
+			import('@opentelemetry/core'),
+			import('@opentelemetry/sdk-trace'),
 			import('@opentelemetry/exporter-trace-otlp-http'),
 			import('@opentelemetry/instrumentation'),
 			import('@opentelemetry/instrumentation-document-load'),
@@ -46,7 +47,7 @@ const initializers: Record<Signal, (resource: Resource) => Promise<void>> = {
 				return pageContext && !api.trace.getSpan(active) ? pageContext : active;
 			}
 		}
-		const provider = new sdk.WebTracerProvider({
+		const provider = new sdk.TracerProvider({
 			resource,
 			spanProcessors: [
 				{
@@ -62,12 +63,19 @@ const initializers: Record<Signal, (resource: Resource) => Promise<void>> = {
 					forceFlush: () => Promise.resolve(),
 					shutdown: () => Promise.resolve()
 				},
-				new sdk.BatchSpanProcessor(new exporter.OTLPTraceExporter({ url: '/api/telemetry/traces' }), {
+				new sdk.BatchSpanProcessor({
+					exporter: new exporter.OTLPTraceExporter({ url: '/api/telemetry/traces' }),
 					maxExportBatchSize: MAX_EXPORT_BATCH_SIZE
 				})
 			]
 		});
-		provider.register({ contextManager: new PageContextManager() });
+		api.trace.setGlobalTracerProvider(provider);
+		api.context.setGlobalContextManager(new PageContextManager().enable());
+		api.propagation.setGlobalPropagator(
+			new core.CompositePropagator({
+				propagators: [new core.W3CTraceContextPropagator(), new core.W3CBaggagePropagator()]
+			})
+		);
 		providers.push(provider);
 		instrumentation.registerInstrumentations({
 			tracerProvider: provider,
@@ -131,7 +139,7 @@ const initializers: Record<Signal, (resource: Resource) => Promise<void>> = {
 	},
 	logs: async (resource) => {
 		const [api, sdk, exporter] = await Promise.all([
-			import('@opentelemetry/api-logs'),
+			import('@opentelemetry/api'),
 			import('@opentelemetry/sdk-logs'),
 			import('@opentelemetry/exporter-logs-otlp-http')
 		]);
