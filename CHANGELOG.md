@@ -1,3 +1,71 @@
+## v2.17.0
+
+### New features
+
+- add Hostname configuration ([\#4391](https://github.com/getarcaneapp/arcane/pull/4391) by @RobLoach)
+- add auto-update delay for new images ([\#4459](https://github.com/getarcaneapp/arcane/pull/4459) by @kmendell)
+- add native Podman support ([\#4514](https://github.com/getarcaneapp/arcane/pull/4514) by @kmendell)
+
+### Bug fixes
+
+- use the opened resource's environment in the tab title with all environments enabled ([\#4450](https://github.com/getarcaneapp/arcane/pull/4450) by @DominikZublasing)
+- honor update-check in x-arcane compose metadata ([\#4457](https://github.com/getarcaneapp/arcane/pull/4457) by @kmendell)
+- remove accept-encoding header for gcs compatibility ([\#4446](https://github.com/getarcaneapp/arcane/pull/4446) by @mbegerau)
+- recover scheduled runs whose finished result was never recorded ([\#4458](https://github.com/getarcaneapp/arcane/pull/4458) by @kmendell)
+- skip volume backup prune when the local repository was never created ([\#4448](https://github.com/getarcaneapp/arcane/pull/4448) by @GiulioSavini)
+- keep a global admin when updating or deleting a role ([\#4472](https://github.com/getarcaneapp/arcane/pull/4472) by @jmrplens)
+- update containers whose image tag was moved by an interrupted run ([8928c09](https://github.com/getarcaneapp/arcane/commit/8928c098a978cb79cc4386707daabb7c2deb2f4f) by @kmendell)
+- keep folder templates intact and require templates:create for download ([\#4473](https://github.com/getarcaneapp/arcane/pull/4473) by @jmrplens)
+- count default networks as in use ([\#4476](https://github.com/getarcaneapp/arcane/pull/4476) by @kmendell)
+- include tagged images in olderThan prune ([48539a1](https://github.com/getarcaneapp/arcane/commit/48539a169acedea1c012a07cb1011107becbffa0) by @kmendell)
+- default S3 signing region to us-east-1 for rustic ([\#4478](https://github.com/getarcaneapp/arcane/pull/4478) by @kmendell)
+- walk project workspace level-by-level and show truncation alert ([\#4479](https://github.com/getarcaneapp/arcane/pull/4479) by @kmendell)
+- keep pulled digest reference when tagging image ([\#4482](https://github.com/getarcaneapp/arcane/pull/4482) by @kmendell)
+- default password fields to new-password autocomplete ([\#4485](https://github.com/getarcaneapp/arcane/pull/4485) by @kmendell)
+- make backup restores and recovery key changes data-safe ([\#4487](https://github.com/getarcaneapp/arcane/pull/4487) by @kmendell)
+- stabilize container redeploys, exec sessions, and streams ([\#4488](https://github.com/getarcaneapp/arcane/pull/4488) by @kmendell)
+- harden auth and authorization, keep browser sessions alive across tabs ([\#4492](https://github.com/getarcaneapp/arcane/pull/4492) by @kmendell)
+- bound shutdown waits and harden scheduler lifecycle ([\#4493](https://github.com/getarcaneapp/arcane/pull/4493) by @kmendell)
+- harden edge environment access and health checks ([\#4489](https://github.com/getarcaneapp/arcane/pull/4489) by @kmendell)
+- harden backend stability and attestation fetches ([\#4491](https://github.com/getarcaneapp/arcane/pull/4491) by @kmendell)
+- list networks with bare-address IPAM ranges ([\#4498](https://github.com/getarcaneapp/arcane/pull/4498) by @kmendell)
+- skip locally built services in project update all ([\#4499](https://github.com/getarcaneapp/arcane/pull/4499) by @kmendell)
+- return correct status codes for project detail errors ([d2b1412](https://github.com/getarcaneapp/arcane/commit/d2b14125858704b7aca85d378250086f9d055010) by @kmendell)
+- hide lifecycle actions for archived projects ([\#4502](https://github.com/getarcaneapp/arcane/pull/4502) by @kmendell)
+- send prune and update notifications after context cancel ([\#4501](https://github.com/getarcaneapp/arcane/pull/4501) by @kmendell)
+- compact table pagination layout on mobile ([\#4503](https://github.com/getarcaneapp/arcane/pull/4503) by @kmendell)
+- stream build workspace file downloads ([\#4508](https://github.com/getarcaneapp/arcane/pull/4508) by @jmrplens)
+- unlock locked managers, accept spec durations, fix stack source and delete ([\#4505](https://github.com/getarcaneapp/arcane/pull/4505) by @jmrplens)
+- apply search and order to the ignored vulnerabilities list ([\#4509](https://github.com/getarcaneapp/arcane/pull/4509) by @jmrplens)
+- keep pending edge environments pending on heartbeat ([\#4507](https://github.com/getarcaneapp/arcane/pull/4507) by @jmrplens)
+- bump updater dependency to v0.11.10 ([\#4512](https://github.com/getarcaneapp/arcane/pull/4512) by @kmendell)
+- return 4xx instead of 500 or 200 for not-found and conflict errors ([\#4506](https://github.com/getarcaneapp/arcane/pull/4506) by @jmrplens)
+- use grouped pending path for scoped project and image updates ([\#4513](https://github.com/getarcaneapp/arcane/pull/4513) by @kmendell)
+- exclude gitops scratch clones from system backups ([\#4519](https://github.com/getarcaneapp/arcane/pull/4519) by @kmendell)
+- keep create button visible and treat unchanged env as valid ([4d28457](https://github.com/getarcaneapp/arcane/commit/4d28457c19f2cf77d78da244521b657297994c08) by @kmendell)
+- cleanup podman ui to match the existing ui ([7f06db1](https://github.com/getarcaneapp/arcane/commit/7f06db1250ac0bf0dd3a5f338df2be7ebb6c3f90) by @kmendell)
+- update e2e tests for disabled create button on editor errors ([52b2eed](https://github.com/getarcaneapp/arcane/commit/52b2eedf1c1fd91536061ebde508dcae4f76c092) by @kmendell)
+- lock updates per project instead of globally ([\#4520](https://github.com/getarcaneapp/arcane/pull/4520) by @kmendell)
+- run bulk project updates sequentially ([\#4524](https://github.com/getarcaneapp/arcane/pull/4524) by @kmendell)
+
+### CLI - Bug fixes
+
+- pass container ID when preparing recreate host config ([59b3616](https://github.com/getarcaneapp/arcane/commit/59b36160137a5498c7ce4a2655a7732bbe5e2929) by @kmendell)
+
+### Performance improvements
+
+- batch queries and cache hot paths across services ([\#4438](https://github.com/getarcaneapp/arcane/pull/4438) by @kmendell)
+- share stats sampling and dashboard producers, back off idle job scans ([\#4486](https://github.com/getarcaneapp/arcane/pull/4486) by @kmendell)
+
+### Other
+
+- vulnerability and jobs migration to composite literals, drop DI nil checks ([9d10c2a](https://github.com/getarcaneapp/arcane/commit/9d10c2a543556868fa2af92498843c09126ca6b2) by @kmendell)
+- migrate containers environments and networks to composite structure ([d2b4166](https://github.com/getarcaneapp/arcane/commit/d2b4166dfbb66f5e67c0801ceb0725825c7b79c2) by @kmendell)
+- migrate updater image updates, and images to composite literals ([4036598](https://github.com/getarcaneapp/arcane/commit/40365984a0b77645418f075026562ef00ad5432b) by @kmendell)
+- rework the Docker boundary, image ownership, and other logic ([\#4484](https://github.com/getarcaneapp/arcane/pull/4484) by @kmendell)
+- inline notification email templates in Go ([\#4517](https://github.com/getarcaneapp/arcane/pull/4517) by @kmendell)
+
+**Full Changelog**: https://github.com/getarcaneapp/arcane/compare/v2.16.1...v2.17.0
 ## v2.16.1
 
 ### Bug fixes
