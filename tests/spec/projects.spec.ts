@@ -508,7 +508,7 @@ test.describe('New Compose Project Page', () => {
 		).toHaveLength(0);
 	});
 
-	test('should hide Create Project when compose syntax is invalid and show it when fixed', async ({
+	test('should disable Create Project when compose syntax is invalid and enable it when fixed', async ({
 		page
 	}) => {
 		await page.getByRole('button', { name: 'My New Project' }).click();
@@ -518,16 +518,16 @@ test.describe('New Compose Project Page', () => {
 		const composeEditor = page.locator('.cm-editor').filter({ visible: true }).first();
 		await expect(composeEditor).toBeVisible();
 
+		const createButton = page.locator('button[data-action="create"]');
 		await setCodeMirrorValue(composeEditor, 'services:\n\tredis:\n\t\timage: redis:latest\n');
-		await expect(page.locator('button[data-action="create"]')).toHaveCount(0);
+		await expect(createButton).toBeVisible();
+		await expect(createButton).toBeDisabled();
 
 		await setCodeMirrorValue(composeEditor, TEST_COMPOSE_YAML);
-		const createButton = page.locator('button[data-action="create"]');
-		await expect(createButton).toBeVisible();
 		await expect(createButton).toBeEnabled();
 	});
 
-	test('should hide Create Project when env syntax is invalid and show it when fixed', async ({
+	test('should disable Create Project when env syntax is invalid and enable it when fixed', async ({
 		page
 	}) => {
 		await page.getByRole('button', { name: 'My New Project' }).click();
@@ -541,12 +541,12 @@ test.describe('New Compose Project Page', () => {
 		await expect(envEditor).toBeVisible();
 
 		await setCodeMirrorValue(composeEditor, TEST_COMPOSE_YAML);
+		const createButton = page.locator('button[data-action="create"]');
 		await setCodeMirrorValue(envEditor, 'NOT VALID LINE');
-		await expect(page.locator('button[data-action="create"]')).toHaveCount(0);
+		await expect(createButton).toBeVisible();
+		await expect(createButton).toBeDisabled();
 
 		await setCodeMirrorValue(envEditor, TEST_ENV_FILE);
-		const createButton = page.locator('button[data-action="create"]');
-		await expect(createButton).toBeVisible();
 		await expect(createButton).toBeEnabled();
 	});
 
