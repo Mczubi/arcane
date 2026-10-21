@@ -2,43 +2,46 @@
 	import { toast } from 'svelte-sonner';
 
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
+	import EnvironmentDestinationSelect from '#lib/components/form/environment-destination-select.svelte';
 	import LabeledSwitch from '#lib/components/form/labeled-switch.svelte';
 	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import EmptyState from '#lib/components/states/empty-state.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
-	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
-	import { useEnvironmentRefresh } from '#lib/hooks/use-environment-refresh.svelte.js';
 	import { AlertIcon, InfoIcon, UpdateIcon } from '#lib/icons/index.js';
 	import { ResourcePageLayout } from '#lib/layouts/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { podmanService } from '#lib/services/podman-service.js';
 	import type { PodmanAutoUpdateResult } from '#lib/types/podman.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
+	import { destinationEnvironmentId } from '#lib/utils/environments.js';
 	import { withOccurrenceKeys } from '#lib/utils/formatting.js';
+	import { shownPodmanEnvironments } from '#lib/utils/podman.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	let { data } = $props();
 
-	const status = $derived(data.podmanStatus);
+	const podmanEnvs = $derived(shownPodmanEnvironments(data.podmanStatuses));
+	let picked = $state('');
+	const environmentId = $derived(destinationEnvironmentId(picked, 'podman:autoupdate', podmanEnvs));
+	const status = $derived(data.podmanStatuses[environmentId]);
 	const mode = $derived(status?.autoUpdateMode ?? 'unavailable');
 
 	let dryRun = $state(false);
 	let rollback = $state(true);
 	let running = $state(false);
 	let result = $state<PodmanAutoUpdateResult | null>(null);
-	let session = 0;
 
-	useEnvironmentRefresh(() => {
-		session += 1;
+	$effect(() => {
+		void environmentId;
 		result = null;
 	});
 
 	async function handleRun() {
-		const started = session;
+		const targetId = environmentId;
 		running = true;
 		await handleApiResultWithCallbacks({
-			result: await tryCatch(podmanService.runAutoUpdate(mode === 'rest' ? { dryRun, rollback } : {})),
+			result: await tryCatch(podmanService.runAutoUpdate(mode === 'rest' ? { dryRun, rollback } : {}, targetId)),
 			message: m.podman_autoupdate_failed(),
 			setLoadingState: (value) => (running = value),
 			onSuccess: (response) => {
@@ -47,15 +50,24 @@
 				} else {
 					toast.success(m.podman_autoupdate_success());
 				}
-				if (started !== session) return;
+				if (targetId !== environmentId) return;
 				result = response;
 			}
 		});
 	}
 </script>
 
-<ResourcePageLayout title={m.auto_update()} subtitle={m.podman_autoupdate_subtitle()} icon={UpdateIcon} environmentPicker>
+<ResourcePageLayout title={m.auto_update()} subtitle={m.podman_autoupdate_subtitle()} icon={UpdateIcon}>
 	{#snippet mainContent()}
+		{#if podmanEnvs.length > 0}
+			<div class="mb-4 flex justify-end">
+				<EnvironmentDestinationSelect
+					bind:value={() => environmentId, (value) => (picked = value)}
+					permission="podman:autoupdate"
+					environments={podmanEnvs}
+				/>
+			</div>
+		{/if}
 		{#if mode === 'unavailable'}
 			<EmptyState
 				icon={UpdateIcon}
@@ -64,34 +76,27 @@
 			/>
 		{:else}
 			<div class="space-y-4">
-				<Card.Root>
-					<Card.Header>
-						<Card.Title>{m.podman_autoupdate_run()}</Card.Title>
-						<Card.Description>
-							{mode === 'rest' ? m.podman_autoupdate_rest_description() : m.podman_autoupdate_systemd_description()}
-						</Card.Description>
-					</Card.Header>
-					<Card.Content>
-						<div class="space-y-4">
-							{#if mode === 'rest'}
-								<LabeledSwitch
-									id="autoupdate-dry-run"
-									label={m.podman_autoupdate_dry_run()}
-									description={m.podman_autoupdate_dry_run_description()}
-									bind:checked={dryRun}
-								/>
-								<LabeledSwitch id="autoupdate-rollback" label={m.podman_autoupdate_rollback()} bind:checked={rollback} />
-							{/if}
-							<ArcaneButton
-								action="update"
-								customLabel={m.podman_autoupdate_run()}
-								onclick={handleRun}
-								loading={running}
-								disabled={running}
-							/>
-						</div>
-					</Card.Content>
-				</Card.Root>
+				<p class="text-sm text-muted-foreground">
+					{mode === 'rest' ? m.podman_autoupdate_rest_description() : m.podman_autoupdate_systemd_description()}
+				</p>
+				<div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+					{#if mode === 'rest'}
+						<LabeledSwitch
+							id="autoupdate-dry-run"
+							label={m.podman_autoupdate_dry_run()}
+							description={m.podman_autoupdate_dry_run_description()}
+							bind:checked={dryRun}
+						/>
+						<LabeledSwitch id="autoupdate-rollback" label={m.podman_autoupdate_rollback()} bind:checked={rollback} />
+					{/if}
+					<ArcaneButton
+						action="update"
+						customLabel={m.podman_autoupdate_run()}
+						onclick={handleRun}
+						loading={running}
+						disabled={running}
+					/>
+				</div>
 
 				{#if result}
 					{#if result.unit}

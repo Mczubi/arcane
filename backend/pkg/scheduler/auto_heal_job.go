@@ -244,7 +244,7 @@ func (j *AutoHealJob) processCandidateInternal(
 		}
 	}
 	containerName := docker.ContainerNameFromNames(candidate.Names)
-	if unit := candidate.Labels[podman.SystemdUnitLabel]; unit != "" {
+	if unit := podman.QuadletUnit(candidate.Labels); unit != "" {
 		slog.DebugContext(ctx, "auto-heal skipping quadlet-managed container", "container", containerName, "unit", unit)
 		return schedulertypes.TargetOutcome{
 			ResourceType: "container",

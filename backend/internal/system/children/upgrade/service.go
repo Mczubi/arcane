@@ -206,7 +206,7 @@ func (s *Service) CanUpgrade(ctx context.Context) (bool, error) {
 	if inspectErr != nil {
 		return false, errors.New("arcane is not running in a Docker container")
 	}
-	if unit := kit.FromPtr(self.Config).Labels[podman.SystemdUnitLabel]; unit != "" {
+	if unit := podman.QuadletUnit(kit.FromPtr(self.Config).Labels); unit != "" {
 		return false, fmt.Errorf("arcane runs from the Quadlet unit %s; update it with podman auto-update instead", unit)
 	}
 	return true, nil
@@ -329,7 +329,7 @@ func (s *Service) prepareUpgrade(ctx context.Context, user usertypes.Actor, targ
 	if err != nil {
 		return nil, err
 	}
-	if unit := kit.FromPtr(current.Config).Labels[podman.SystemdUnitLabel]; unit != "" {
+	if unit := podman.QuadletUnit(kit.FromPtr(current.Config).Labels); unit != "" {
 		return nil, fmt.Errorf("systemd unit %s: %w", unit, common.ErrContainerQuadletManaged)
 	}
 

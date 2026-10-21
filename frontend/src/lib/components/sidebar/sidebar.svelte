@@ -73,12 +73,7 @@
 	);
 	const swarmItems = $derived(filterByPermissions(swarmItemsRaw, effectiveUser ?? null, currentEnvId, permissionsManifest));
 	const podmanItems = $derived(
-		filterByPermissions(
-			getPodmanNavigationItems(podmanStatuses, currentEnvId),
-			effectiveUser ?? null,
-			currentEnvId,
-			permissionsManifest
-		)
+		filterByPermissions(getPodmanNavigationItems(podmanStatuses), effectiveUser ?? null, currentEnvId, permissionsManifest)
 	);
 	const settingsItems = $derived(
 		filterByPermissions(navigationItems.settingsItems, effectiveUser ?? null, currentEnvId, permissionsManifest)

@@ -23,7 +23,7 @@
 
 	const pageState = new ResourceListPageState(untrack(() => data.requestOptions));
 	const quadletEnvironments = $derived(shownPodmanEnvironments(data.podmanStatuses, (status) => status.quadletsSupported));
-	const canInstall = $derived(hasPermission('podman:quadlets', pageState.envId) && !!data.podmanStatus?.quadletsSupported);
+	const canInstall = $derived(quadletEnvironments.some((env) => hasPermission('podman:quadlets', env.id)));
 
 	const quadletsQuery = createQuery(() => {
 		const queryScope = pageState.scope;

@@ -168,8 +168,95 @@ func (c *Client) PodList(ctx context.Context, filters map[string][]string) ([]po
 	})
 }
 
+type podInfraConfigResponse struct {
+	podmantypes.PodInfraConfig
+	PidNS string `json:"pid_ns"`
+	UtsNS string `json:"uts_ns"`
+}
+
+type podInspectResponse struct {
+	podmantypes.PodInspect
+	InfraConfig        *podInfraConfigResponse         `json:"InfraConfig"`
+	CPUPeriod          uint64                          `json:"cpu_period"`
+	CPUQuota           int64                           `json:"cpu_quota"`
+	CPUShares          uint64                          `json:"cpu_shares"`
+	CPUSetCPUs         string                          `json:"cpuset_cpus"`
+	CPUSetMems         string                          `json:"cpuset_mems"`
+	MemoryLimit        uint64                          `json:"memory_limit"`
+	MemorySwap         uint64                          `json:"memory_swap"`
+	BlkioWeight        uint64                          `json:"blkio_weight"`
+	BlkioWeightDevices []podmantypes.PodWeightDevice   `json:"blkio_weight_device"`
+	DeviceReadBps      []podmantypes.PodThrottleDevice `json:"device_read_bps"`
+	DeviceWriteBps     []podmantypes.PodThrottleDevice `json:"device_write_bps"`
+	VolumesFrom        []string                        `json:"volumes_from"`
+	SecurityOpts       []string                        `json:"security_opt"`
+}
+
 func (c *Client) PodInspect(ctx context.Context, nameOrID string) (podmantypes.PodInspect, error) {
-	return c.doJSON[podmantypes.PodInspect](ctx, request{method: http.MethodGet, path: "/pods/" + url.PathEscape(nameOrID) + "/json"})
+	raw, err := c.doJSON[podInspectResponse](ctx, request{method: http.MethodGet, path: "/pods/" + url.PathEscape(nameOrID) + "/json"})
+	if err != nil {
+		return podmantypes.PodInspect{}, err
+	}
+
+	return podmantypes.PodInspect{
+		ID:               raw.ID,
+		Name:             raw.Name,
+		Namespace:        raw.Namespace,
+		Created:          raw.Created,
+		State:            raw.State,
+		CreateCommand:    raw.CreateCommand,
+		ExitPolicy:       raw.ExitPolicy,
+		RestartPolicy:    raw.RestartPolicy,
+		Hostname:         raw.Hostname,
+		Labels:           raw.Labels,
+		CreateCgroup:     raw.CreateCgroup,
+		CgroupParent:     raw.CgroupParent,
+		CgroupPath:       raw.CgroupPath,
+		CreateInfra:      raw.CreateInfra,
+		InfraContainerID: raw.InfraContainerID,
+		InfraConfig: func() *podmantypes.PodInfraConfig {
+			if raw.InfraConfig == nil {
+				return nil
+			}
+			return &podmantypes.PodInfraConfig{
+				PortBindings:       raw.InfraConfig.PortBindings,
+				HostNetwork:        raw.InfraConfig.HostNetwork,
+				StaticIP:           raw.InfraConfig.StaticIP,
+				StaticMAC:          raw.InfraConfig.StaticMAC,
+				NoManageResolvConf: raw.InfraConfig.NoManageResolvConf,
+				DNSServer:          raw.InfraConfig.DNSServer,
+				DNSSearch:          raw.InfraConfig.DNSSearch,
+				DNSOption:          raw.InfraConfig.DNSOption,
+				NoManageHostname:   raw.InfraConfig.NoManageHostname,
+				NoManageHosts:      raw.InfraConfig.NoManageHosts,
+				HostAdd:            raw.InfraConfig.HostAdd,
+				HostsFile:          raw.InfraConfig.HostsFile,
+				Networks:           raw.InfraConfig.Networks,
+				NetworkOptions:     raw.InfraConfig.NetworkOptions,
+				PidNS:              raw.InfraConfig.PidNS,
+				UserNS:             raw.InfraConfig.UserNS,
+				UtsNS:              raw.InfraConfig.UtsNS,
+			}
+		}(),
+		SharedNamespaces:   raw.SharedNamespaces,
+		NumContainers:      raw.NumContainers,
+		Containers:         raw.Containers,
+		CPUPeriod:          raw.CPUPeriod,
+		CPUQuota:           raw.CPUQuota,
+		CPUShares:          raw.CPUShares,
+		CPUSetCPUs:         raw.CPUSetCPUs,
+		CPUSetMems:         raw.CPUSetMems,
+		MemoryLimit:        raw.MemoryLimit,
+		MemorySwap:         raw.MemorySwap,
+		BlkioWeight:        raw.BlkioWeight,
+		BlkioWeightDevices: raw.BlkioWeightDevices,
+		DeviceReadBps:      raw.DeviceReadBps,
+		DeviceWriteBps:     raw.DeviceWriteBps,
+		Mounts:             raw.Mounts,
+		Devices:            raw.Devices,
+		VolumesFrom:        raw.VolumesFrom,
+		SecurityOpts:       raw.SecurityOpts,
+	}, nil
 }
 
 func (c *Client) PodCreate(ctx context.Context, spec PodSpec) (string, error) {

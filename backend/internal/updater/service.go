@@ -77,7 +77,7 @@ var (
 
 	updateLabelPolicy = updater.LabelPolicy{
 		IsUpdateDisabledFunc: func(l map[string]string) bool {
-			return labels.IsUpdateDisabled(l) || l[podman.SystemdUnitLabel] != ""
+			return labels.IsUpdateDisabled(l) || podman.QuadletUnit(l) != ""
 		},
 	}
 )

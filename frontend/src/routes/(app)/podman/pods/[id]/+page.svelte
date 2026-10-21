@@ -2,24 +2,39 @@
 	import { goto } from '$app/navigation';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 
+	import ActionButtonGroup from '#lib/components/action-button-group/action-button-group.svelte';
 	import type { ActionButton } from '#lib/components/action-button-group/types.js';
-	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
-	import EmptyState from '#lib/components/states/empty-state.svelte';
+	import EnvironmentCell from '#lib/components/arcane-table/cells/environment-cell.svelte';
+	import ResourceNotFound from '#lib/components/resource-not-found.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
-	import * as Table from '#lib/components/ui/table/index.js';
-	import MonoCell from '#lib/components/vulnerability/mono-cell.svelte';
-	import { AlertTriangleIcon, ContainersIcon, InfoIcon, LayoutListIcon, StatsIcon } from '#lib/icons/index.js';
-	import { ResourceDetailLayout } from '#lib/layouts/index.js';
+	import * as Tabs from '#lib/components/ui/tabs/index.js';
+	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
+	import {
+		AlertTriangleIcon,
+		ContainersIcon,
+		InfoIcon,
+		InspectIcon,
+		LayoutListIcon,
+		NetworksIcon,
+		StatsIcon,
+		CpuIcon
+	} from '#lib/icons/index.js';
+	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { podmanService, type PodmanPodAction } from '#lib/services/podman-service.js';
 	import { extractApiErrorMessage } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
-	import { environmentHref } from '#lib/utils/environments.js';
-	import { formatDateTime, withOccurrenceKeys } from '#lib/utils/formatting.js';
 	import { podmanStateVariant } from '#lib/utils/podman.js';
 
+	import PodContainers from '../components/pod-containers.svelte';
+	import PodInspect from '../components/pod-inspect.svelte';
+	import PodNetwork from '../components/pod-network.svelte';
+	import PodOverview from '../components/pod-overview.svelte';
+	import PodProcesses from '../components/pod-processes.svelte';
+	import PodResources from '../components/pod-resources.svelte';
+	import PodStats from '../components/pod-stats.svelte';
 	import { confirmRemovePod, podActionLabels, runPodAction } from '../pod-actions';
 
 	let { data } = $props();
@@ -34,25 +49,8 @@
 		retry: false
 	}));
 	const pod = $derived(podQuery.data ?? data.pod);
-	const members = $derived(pod.containers ?? []);
 	const isRunning = $derived(pod.state.toLowerCase() === 'running');
 	const canManage = $derived(hasPermission('podman:pods', envId));
-
-	const statsQuery = createQuery(() => ({
-		queryKey: queryKeys.podman.podStats(envId, pod.name),
-		queryFn: () => podmanService.getPodStats([pod.name], envId),
-		enabled: isRunning,
-		refetchInterval: 5000,
-		retry: false
-	}));
-
-	const topQuery = createQuery(() => ({
-		queryKey: queryKeys.podman.podTop(envId, pod.id),
-		queryFn: () => podmanService.getPodTop(pod.id, envId),
-		enabled: isRunning,
-		refetchInterval: 5000,
-		retry: false
-	}));
 
 	let pendingAction = $state<PodmanPodAction | null>(null);
 
@@ -94,149 +92,93 @@
 			: []
 	);
 
-	const portBindings = $derived(
-		Object.entries(pod.infraConfig?.portBindings ?? {}).flatMap(([containerPort, bindings]) =>
-			(bindings ?? []).map((binding) => `${binding.hostIp ? `${binding.hostIp}:` : ''}${binding.hostPort} → ${containerPort}`)
-		)
-	);
+	const urlTab = useUrlTab({
+		tabs: () => [
+			{ value: 'overview', label: m.common_overview(), icon: InfoIcon },
+			{ value: 'containers', label: m.containers(), icon: ContainersIcon },
+			{ value: 'network', label: m.resource_networks_cap(), icon: NetworksIcon },
+			{ value: 'resources', label: m.common_resources(), icon: CpuIcon },
+			{ value: 'stats', label: m.containers_nav_metrics(), icon: StatsIcon },
+			{ value: 'processes', label: m.containers_processes_title(), icon: LayoutListIcon },
+			{ value: 'inspect', label: m.common_inspect(), icon: InspectIcon }
+		],
+		defaultTab: () => 'overview'
+	});
 </script>
 
-<ResourceDetailLayout
-	backUrl="/podman/pods"
-	backLabel={m.podman_pods_title()}
-	title={pod.name}
-	subtitle={`${m.common_id()}: ${pod.id.slice(0, 12)}`}
-	{actions}
->
-	{#snippet badges()}
-		<Badge variant={podmanStateVariant(pod.state)} minWidth="20">{pod.state}</Badge>
-	{/snippet}
-
-	{#if podQuery.isError}
-		<Alert.Root variant="destructive">
-			<AlertTriangleIcon class="size-4" />
-			<Alert.Title>{m.podman_updates_paused()}</Alert.Title>
-			<Alert.Description>{extractApiErrorMessage(podQuery.error)}</Alert.Description>
-		</Alert.Root>
-	{/if}
-
-	<DetailSection title={m.common_overview()} icon={InfoIcon}>
-		<KeyValueGrid>
-			<KeyValueCard label={m.common_id()}>{pod.id}</KeyValueCard>
-			<KeyValueCard label={m.common_created()}>{formatDateTime(pod.created) || pod.created}</KeyValueCard>
-			{#if pod.hostname}
-				<KeyValueCard label={m.hostname()}>{pod.hostname}</KeyValueCard>
-			{/if}
-			<KeyValueCard label={m.podman_pod_infra()}>{pod.createInfra ? m.common_yes() : m.common_no()}</KeyValueCard>
-			{#if pod.sharedNamespaces?.length}
-				<KeyValueCard label={m.podman_pod_shared_namespaces()}>{pod.sharedNamespaces.join(', ')}</KeyValueCard>
-			{/if}
-			{#if pod.infraConfig?.networks?.length}
-				<KeyValueCard label={m.resource_networks_cap()}>{pod.infraConfig.networks.join(', ')}</KeyValueCard>
-			{/if}
-			{#if portBindings.length > 0}
-				<KeyValueCard label={m.common_ports()}>{portBindings.join(', ')}</KeyValueCard>
-			{/if}
-		</KeyValueGrid>
-	</DetailSection>
-
-	<DetailSection title={m.containers()} icon={ContainersIcon}>
-		{#if members.length === 0}
-			<EmptyState icon={ContainersIcon} title={m.podman_pod_no_containers()} variant="plain" />
-		{:else}
-			<div class="divide-y rounded-lg border">
-				{#each members as member (member.id)}
-					<div class="flex items-center justify-between gap-3 p-3">
-						<a class="min-w-0 truncate font-medium hover:underline" href={environmentHref(`/containers/${member.id}`, envId)}
-							>{member.name}</a
-						>
-						<div class="flex items-center gap-2">
-							{#if member.id === pod.infraContainerId}
-								<Badge variant="gray" size="sm">{m.podman_pod_infra()}</Badge>
-							{/if}
-							<Badge variant={podmanStateVariant(member.state)} size="sm">{member.state}</Badge>
-						</div>
-					</div>
-				{/each}
+{#if pod}
+	<TabbedPageLayout
+		backUrl="/podman/pods"
+		backLabel={m.common_back()}
+		tabItems={urlTab.items}
+		selectedTab={urlTab.value}
+		onTabChange={urlTab.select}
+	>
+		{#snippet headerInfo()}
+			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+				<h1 class="max-w-40 min-w-0 truncate text-lg font-semibold sm:max-w-56 md:max-w-72 lg:max-w-88" title={pod.name}>
+					{pod.name}
+				</h1>
+				<Badge variant={podmanStateVariant(pod.state)} minWidth="20">{pod.state}</Badge>
+				<EnvironmentCell value={envId} />
 			</div>
-		{/if}
-	</DetailSection>
+		{/snippet}
 
-	<DetailSection title={m.containers_resource_metrics()} icon={StatsIcon}>
-		{#if !isRunning}
-			<EmptyState icon={StatsIcon} title={m.common_unavailable()} description={m.podman_pod_not_running()} variant="plain" />
-		{:else if statsQuery.isError}
-			<EmptyState
-				icon={StatsIcon}
-				title={m.common_load_failed({ resource: m.containers_resource_metrics() })}
-				description={extractApiErrorMessage(statsQuery.error)}
-				actionLabel={m.common_retry()}
-				onAction={() => statsQuery.refetch()}
-				variant="plain"
-			/>
-		{:else}
-			<div class="overflow-x-auto rounded-lg border">
-				<Table.Root aria-label={m.containers_resource_metrics()}>
-					<Table.Header>
-						<Table.Row>
-							<Table.Head scope="col">{m.common_name()}</Table.Head>
-							<Table.Head scope="col">{m.cpu_usage()}</Table.Head>
-							<Table.Head scope="col">{m.memory_usage()}</Table.Head>
-							<Table.Head scope="col">{m.containers_block_io()}</Table.Head>
-							<Table.Head scope="col">{m.containers_network_io()}</Table.Head>
-							<Table.Head scope="col">{m.podman_pids()}</Table.Head>
-						</Table.Row>
-					</Table.Header>
-					<Table.Body>
-						{#each statsQuery.data ?? [] as stat (stat.cid)}
-							<Table.Row>
-								<Table.Cell>{stat.name}</Table.Cell>
-								<Table.Cell><MonoCell value={stat.cpu} /></Table.Cell>
-								<Table.Cell><MonoCell value={stat.memUsage} /></Table.Cell>
-								<Table.Cell><MonoCell value={stat.blockIo} /></Table.Cell>
-								<Table.Cell><MonoCell value={stat.netIo} /></Table.Cell>
-								<Table.Cell><MonoCell value={stat.pids} /></Table.Cell>
-							</Table.Row>
-						{/each}
-					</Table.Body>
-				</Table.Root>
-			</div>
-		{/if}
-	</DetailSection>
+		{#snippet headerActions()}
+			{#if actions.length > 0}
+				<ActionButtonGroup buttons={actions} />
+			{/if}
+		{/snippet}
 
-	<DetailSection title={m.containers_processes_title()} icon={LayoutListIcon}>
-		{#if !isRunning}
-			<EmptyState icon={LayoutListIcon} title={m.common_unavailable()} description={m.podman_pod_not_running()} variant="plain" />
-		{:else if topQuery.isError}
-			<EmptyState
-				icon={LayoutListIcon}
-				title={m.common_load_failed({ resource: m.containers_processes_title() })}
-				description={extractApiErrorMessage(topQuery.error)}
-				actionLabel={m.common_retry()}
-				onAction={() => topQuery.refetch()}
-				variant="plain"
-			/>
-		{:else if topQuery.data}
-			<div class="overflow-x-auto rounded-lg border">
-				<Table.Root aria-label={m.containers_processes_title()}>
-					<Table.Header>
-						<Table.Row>
-							{#each withOccurrenceKeys(topQuery.data.titles) as title (title.key)}
-								<Table.Head scope="col">{title.value}</Table.Head>
-							{/each}
-						</Table.Row>
-					</Table.Header>
-					<Table.Body>
-						{#each topQuery.data.processes ?? [] as cells (JSON.stringify(cells))}
-							<Table.Row>
-								{#each withOccurrenceKeys(cells) as cell (cell.key)}
-									<Table.Cell><MonoCell value={cell.value} /></Table.Cell>
-								{/each}
-							</Table.Row>
-						{/each}
-					</Table.Body>
-				</Table.Root>
-			</div>
-		{/if}
-	</DetailSection>
-</ResourceDetailLayout>
+		{#snippet subHeader()}
+			{#if podQuery.isError}
+				<Alert.Root variant="destructive" class="mt-3">
+					<AlertTriangleIcon class="size-4" />
+					<Alert.Title>{m.podman_updates_paused()}</Alert.Title>
+					<Alert.Description>{extractApiErrorMessage(podQuery.error)}</Alert.Description>
+				</Alert.Root>
+			{/if}
+		{/snippet}
+
+		{#snippet tabContent(activeTab)}
+			<Tabs.Content value="overview" class="h-full">
+				<PodOverview {pod} />
+			</Tabs.Content>
+
+			<Tabs.Content value="containers" class="h-full">
+				<PodContainers {pod} {envId} />
+			</Tabs.Content>
+
+			<Tabs.Content value="network" class="h-full">
+				<PodNetwork infraConfig={pod.infraConfig} />
+			</Tabs.Content>
+
+			<Tabs.Content value="resources" class="h-full">
+				<PodResources {pod} />
+			</Tabs.Content>
+
+			<Tabs.Content value="stats" class="h-full">
+				{#if activeTab === 'stats'}
+					<PodStats podName={pod.name} {envId} {isRunning} />
+				{/if}
+			</Tabs.Content>
+
+			<Tabs.Content value="processes" class="h-full">
+				{#if activeTab === 'processes'}
+					<PodProcesses podId={pod.id} {envId} {isRunning} />
+				{/if}
+			</Tabs.Content>
+
+			<Tabs.Content value="inspect" class="h-full">
+				<PodInspect {pod} />
+			</Tabs.Content>
+		{/snippet}
+	</TabbedPageLayout>
+{:else}
+	<ResourceNotFound
+		resource={m.podman_pod()}
+		resourceListTitle={m.podman_pods_title()}
+		backHref="/podman/pods"
+		onRetry={() => podQuery.refetch()}
+	/>
+{/if}

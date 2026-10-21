@@ -34,31 +34,101 @@ type PodPortBinding struct {
 }
 
 type PodInfraConfig struct {
-	PortBindings map[string][]PodPortBinding `json:"portBindings,omitempty"`
-	HostNetwork  bool                        `json:"hostNetwork"`
-	Networks     []string                    `json:"networks,omitempty"`
+	PortBindings       map[string][]PodPortBinding `json:"portBindings,omitempty"`
+	HostNetwork        bool                        `json:"hostNetwork"`
+	StaticIP           string                      `json:"staticIp,omitempty"`
+	StaticMAC          string                      `json:"staticMac,omitempty"`
+	NoManageResolvConf bool                        `json:"noManageResolvConf"`
+	DNSServer          []string                    `json:"dnsServer,omitempty"`
+	DNSSearch          []string                    `json:"dnsSearch,omitempty"`
+	DNSOption          []string                    `json:"dnsOption,omitempty"`
+	NoManageHostname   bool                        `json:"noManageHostname"`
+	NoManageHosts      bool                        `json:"noManageHosts"`
+	HostAdd            []string                    `json:"hostAdd,omitempty"`
+	HostsFile          string                      `json:"hostsFile,omitempty"`
+	Networks           []string                    `json:"networks,omitempty"`
+	NetworkOptions     map[string][]string         `json:"networkOptions,omitempty"`
+	PidNS              string                      `json:"pidNs,omitempty"`
+	UserNS             string                      `json:"userNs,omitempty"`
+	UtsNS              string                      `json:"utsNs,omitempty"`
 }
 
 type PodInspectContainer struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	State string `json:"state"`
+	ID       string           `json:"id"`
+	Name     string           `json:"name"`
+	State    string           `json:"state"`
+	Image    string           `json:"image,omitempty"`
+	Status   string           `json:"status,omitempty"`
+	Created  time.Time        `json:"created"`
+	ExitCode int32            `json:"exitCode"`
+	IsInfra  bool             `json:"isInfra"`
+	Ports    []PodPortMapping `json:"ports,omitempty"`
+}
+
+type PodMount struct {
+	Type        string   `json:"type"`
+	Name        string   `json:"name,omitempty"`
+	Source      string   `json:"source,omitempty"`
+	Destination string   `json:"destination"`
+	Driver      string   `json:"driver,omitempty"`
+	Mode        string   `json:"mode,omitempty"`
+	Options     []string `json:"options,omitempty"`
+	RW          bool     `json:"rw"`
+	Propagation string   `json:"propagation,omitempty"`
+	SubPath     string   `json:"subPath,omitempty"`
+}
+
+type PodDevice struct {
+	PathOnHost        string `json:"pathOnHost"`
+	PathInContainer   string `json:"pathInContainer"`
+	CgroupPermissions string `json:"cgroupPermissions,omitempty"`
+}
+
+type PodWeightDevice struct {
+	Path   string `json:"path"`
+	Weight uint16 `json:"weight"`
+}
+
+type PodThrottleDevice struct {
+	Path string `json:"path"`
+	Rate uint64 `json:"rate"`
 }
 
 type PodInspect struct {
-	ID               string                `json:"id"`
-	Name             string                `json:"name"`
-	Namespace        string                `json:"namespace,omitempty"`
-	Created          time.Time             `json:"created"`
-	State            string                `json:"state"`
-	Hostname         string                `json:"hostname,omitempty"`
-	Labels           map[string]string     `json:"labels,omitempty"`
-	CreateInfra      bool                  `json:"createInfra"`
-	InfraContainerID string                `json:"infraContainerId,omitempty"`
-	InfraConfig      *PodInfraConfig       `json:"infraConfig,omitempty"`
-	SharedNamespaces []string              `json:"sharedNamespaces,omitempty"`
-	NumContainers    uint                  `json:"numContainers"`
-	Containers       []PodInspectContainer `json:"containers"`
+	ID                 string                `json:"id"`
+	Name               string                `json:"name"`
+	Namespace          string                `json:"namespace,omitempty"`
+	Created            time.Time             `json:"created"`
+	State              string                `json:"state"`
+	CreateCommand      []string              `json:"createCommand,omitempty"`
+	ExitPolicy         string                `json:"exitPolicy,omitempty"`
+	RestartPolicy      string                `json:"restartPolicy,omitempty"`
+	Hostname           string                `json:"hostname,omitempty"`
+	Labels             map[string]string     `json:"labels,omitempty"`
+	CreateCgroup       bool                  `json:"createCgroup"`
+	CgroupParent       string                `json:"cgroupParent,omitempty"`
+	CgroupPath         string                `json:"cgroupPath,omitempty"`
+	CreateInfra        bool                  `json:"createInfra"`
+	InfraContainerID   string                `json:"infraContainerId,omitempty"`
+	InfraConfig        *PodInfraConfig       `json:"infraConfig,omitempty"`
+	SharedNamespaces   []string              `json:"sharedNamespaces,omitempty"`
+	NumContainers      uint                  `json:"numContainers"`
+	Containers         []PodInspectContainer `json:"containers"`
+	CPUPeriod          uint64                `json:"cpuPeriod,omitempty"`
+	CPUQuota           int64                 `json:"cpuQuota,omitempty"`
+	CPUShares          uint64                `json:"cpuShares,omitempty"`
+	CPUSetCPUs         string                `json:"cpusetCpus,omitempty"`
+	CPUSetMems         string                `json:"cpusetMems,omitempty"`
+	MemoryLimit        uint64                `json:"memoryLimit,omitempty"`
+	MemorySwap         uint64                `json:"memorySwap,omitempty"`
+	BlkioWeight        uint64                `json:"blkioWeight,omitempty"`
+	BlkioWeightDevices []PodWeightDevice     `json:"blkioWeightDevices,omitempty"`
+	DeviceReadBps      []PodThrottleDevice   `json:"deviceReadBps,omitempty"`
+	DeviceWriteBps     []PodThrottleDevice   `json:"deviceWriteBps,omitempty"`
+	Mounts             []PodMount            `json:"mounts,omitempty"`
+	Devices            []PodDevice           `json:"devices,omitempty"`
+	VolumesFrom        []string              `json:"volumesFrom,omitempty"`
+	SecurityOpts       []string              `json:"securityOpts,omitempty"`
 }
 
 type PodPortMapping struct {
@@ -187,4 +257,5 @@ type Container struct {
 	Pod       string            `json:"pod,omitempty"`
 	PodName   string            `json:"podName,omitempty"`
 	IsInfra   bool              `json:"isInfra"`
+	Ports     []PodPortMapping  `json:"ports,omitempty"`
 }

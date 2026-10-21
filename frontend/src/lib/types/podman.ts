@@ -150,13 +150,62 @@ export interface PodmanPodPortBinding {
 export interface PodmanPodInfraConfig {
 	portBindings?: Record<string, PodmanPodPortBinding[]>;
 	hostNetwork: boolean;
+	staticIp?: string;
+	staticMac?: string;
+	noManageResolvConf: boolean;
+	dnsServer?: string[];
+	dnsSearch?: string[];
+	dnsOption?: string[];
+	noManageHostname: boolean;
+	noManageHosts: boolean;
+	hostAdd?: string[];
+	hostsFile?: string;
 	networks?: string[];
+	networkOptions?: Record<string, string[]>;
+	pidNs?: string;
+	userNs?: string;
+	utsNs?: string;
 }
 
 export interface PodmanPodInspectContainer {
 	id: string;
 	name: string;
 	state: string;
+	image?: string;
+	status?: string;
+	created: string;
+	exitCode: number;
+	isInfra: boolean;
+	ports?: PodmanPodPortMapping[];
+}
+
+export interface PodmanPodMount {
+	type: string;
+	name?: string;
+	source?: string;
+	destination: string;
+	driver?: string;
+	mode?: string;
+	options?: string[];
+	rw: boolean;
+	propagation?: string;
+	subPath?: string;
+}
+
+export interface PodmanPodDevice {
+	pathOnHost: string;
+	pathInContainer: string;
+	cgroupPermissions?: string;
+}
+
+export interface PodmanPodWeightDevice {
+	path: string;
+	weight: number;
+}
+
+export interface PodmanPodThrottleDevice {
+	path: string;
+	rate: number;
 }
 
 export interface PodmanPodInspect {
@@ -165,14 +214,35 @@ export interface PodmanPodInspect {
 	namespace?: string;
 	created: string;
 	state: string;
+	createCommand?: string[];
+	exitPolicy?: string;
+	restartPolicy?: string;
 	hostname?: string;
 	labels?: Record<string, string>;
+	createCgroup: boolean;
+	cgroupParent?: string;
+	cgroupPath?: string;
 	createInfra: boolean;
 	infraContainerId?: string;
 	infraConfig?: PodmanPodInfraConfig;
 	sharedNamespaces?: string[];
 	numContainers: number;
 	containers: PodmanPodInspectContainer[] | null;
+	cpuPeriod?: number;
+	cpuQuota?: number;
+	cpuShares?: number;
+	cpusetCpus?: string;
+	cpusetMems?: string;
+	memoryLimit?: number;
+	memorySwap?: number;
+	blkioWeight?: number;
+	blkioWeightDevices?: PodmanPodWeightDevice[];
+	deviceReadBps?: PodmanPodThrottleDevice[];
+	deviceWriteBps?: PodmanPodThrottleDevice[];
+	mounts?: PodmanPodMount[];
+	devices?: PodmanPodDevice[];
+	volumesFrom?: string[];
+	securityOpts?: string[];
 }
 
 export interface PodmanPodPortMapping {

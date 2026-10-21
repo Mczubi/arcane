@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	podmantypes "github.com/getarcaneapp/arcane/types/v2/podman"
 	"github.com/stretchr/testify/assert"
@@ -274,6 +275,99 @@ func TestCreateRejectsInvalidOptions(t *testing.T) {
 			})
 			_, err := svc.Create(t.Context(), tt.req)
 			require.ErrorIs(t, err, common.ErrBadRequest)
+		})
+	}
+}
+
+func TestInspectMergesContainerDetails(t *testing.T) {
+	tests := []struct {
+		name       string
+		listStatus int
+		want       []podmantypes.PodInspectContainer
+		wantErr    bool
+	}{
+		{
+			name:       "merges list details by id",
+			listStatus: http.StatusOK,
+			want: []podmantypes.PodInspectContainer{
+				{
+					ID:      "infra1",
+					Name:    "web-infra",
+					State:   "running",
+					Image:   "localhost/podman-pause:5.4.0",
+					Status:  "Up 2 minutes",
+					Created: time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC),
+					IsInfra: true,
+					Ports: []podmantypes.PodPortMapping{
+						{
+							ContainerPort: 80,
+							HostPort:      8080,
+							Protocol:      "tcp",
+							Range:         1,
+						},
+					},
+				},
+				{
+					ID:       "app1",
+					Name:     "web-app",
+					State:    "exited",
+					Image:    "docker.io/library/nginx:latest",
+					Status:   "Exited (1) 1 minute ago",
+					Created:  time.Date(2026, 10, 1, 12, 1, 0, 0, time.UTC),
+					ExitCode: 1,
+					Ports:    []podmantypes.PodPortMapping{},
+				},
+				{
+					ID:    "gone1",
+					Name:  "web-gone",
+					State: "removing",
+				},
+			},
+		},
+		{
+			name:       "container list failure",
+			listStatus: http.StatusInternalServerError,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/v4.0.0/libpod/pods/web/json":
+					_, _ = w.Write([]byte(`{"Id":"pod123","Name":"web","Containers":[
+						{"Id":"infra1","Name":"web-infra","State":"running"},
+						{"Id":"app1","Name":"web-app","State":"exited"},
+						{"Id":"gone1","Name":"web-gone","State":"removing"}
+					]}`))
+				case "/v4.0.0/libpod/containers/json":
+					assert.JSONEq(t, `{"pod":["pod123"]}`, r.URL.Query().Get("filters"))
+					w.WriteHeader(tt.listStatus)
+					_, _ = w.Write([]byte(`[
+						{"Id":"app1","Image":"docker.io/library/nginx:latest","Status":"Exited (1) 1 minute ago","Created":"2026-10-01T12:01:00Z","ExitCode":1},
+						{"Id":"infra1","Image":"localhost/podman-pause:5.4.0","Status":"Up 2 minutes","Created":"2026-10-01T12:00:00Z","IsInfra":true,
+							"Ports":[{"container_port":80,"host_port":8080,"range":1,"protocol":"tcp"}]}
+					]`))
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			t.Cleanup(server.Close)
+			client, err := podman.NewClient(server.URL)
+			require.NoError(t, err)
+
+			svc := NewService(func(context.Context) (podman.Runtime, error) {
+				return podman.Runtime{Client: client}, nil
+			})
+			pod, err := svc.Inspect(t.Context(), "web")
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, pod.Containers)
 		})
 	}
 }

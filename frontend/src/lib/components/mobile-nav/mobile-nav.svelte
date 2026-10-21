@@ -40,7 +40,7 @@
 	const navigationSettings = $derived(navigation.settings);
 	const currentEnvId = $derived(environmentStore.selected?.id || '0');
 	const swarmItems = $derived(getSwarmNavigationItems(swarmEnabled, currentEnvId));
-	const podmanItems = $derived(getPodmanNavigationItems(podmanStatuses, currentEnvId));
+	const podmanItems = $derived(getPodmanNavigationItems(podmanStatuses));
 
 	const pinnedItems = $derived.by(() => {
 		if (!navigationSettings?.pinnedItems) return [];

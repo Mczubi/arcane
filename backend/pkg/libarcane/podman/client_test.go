@@ -140,7 +140,7 @@ func TestClientContainerList(t *testing.T) {
 		assert.Equal(t, "/v4.0.0/libpod/containers/json", r.URL.Path)
 		assert.Equal(t, "true", r.URL.Query().Get("all"))
 		assert.JSONEq(t, `{"label":["PODMAN_SYSTEMD_UNIT=web.service"]}`, r.URL.Query().Get("filters"))
-		_, _ = w.Write([]byte(`[{"Id":"abc","Names":["web"],"Labels":{"PODMAN_SYSTEMD_UNIT":"web.service"},"PodName":"","IsInfra":false}]`))
+		_, _ = w.Write([]byte(`[{"Id":"abc","Names":["web"],"Labels":{"PODMAN_SYSTEMD_UNIT":"web.service"},"PodName":"","IsInfra":false,"Ports":[{"host_ip":"127.0.0.1","container_port":80,"host_port":8080,"range":1,"protocol":"tcp"}]}]`))
 	})
 
 	containers, err := client.ContainerList(t.Context(), []string{podmantypes.SystemdUnitLabel + "=web.service"}, nil)
@@ -148,6 +148,15 @@ func TestClientContainerList(t *testing.T) {
 	require.Len(t, containers, 1)
 	assert.Equal(t, "abc", containers[0].ID)
 	assert.Equal(t, "web.service", containers[0].Labels[podmantypes.SystemdUnitLabel])
+	assert.Equal(t, []podmantypes.PodPortMapping{
+		{
+			ContainerPort: 80,
+			HostPort:      8080,
+			HostIP:        "127.0.0.1",
+			Protocol:      "tcp",
+			Range:         1,
+		},
+	}, containers[0].Ports)
 }
 
 func TestClientErrorClassification(t *testing.T) {

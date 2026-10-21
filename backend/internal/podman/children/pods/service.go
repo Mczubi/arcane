@@ -105,7 +105,35 @@ func (s *Service) Inspect(ctx context.Context, nameOrID string) (podmantypes.Pod
 	if err != nil {
 		return podmantypes.PodInspect{}, err
 	}
-	return rt.Client.PodInspect(ctx, nameOrID)
+	pod, err := rt.Client.PodInspect(ctx, nameOrID)
+	if err != nil {
+		return podmantypes.PodInspect{}, err
+	}
+	containers, err := rt.Client.ContainerList(ctx, nil, []string{pod.ID})
+	if err != nil {
+		return podmantypes.PodInspect{}, fmt.Errorf("list containers for pod %s: %w", pod.ID, err)
+	}
+
+	for i, member := range pod.Containers {
+		index := slices.IndexFunc(containers, func(c podmantypes.Container) bool {
+			return c.ID == member.ID
+		})
+		if index < 0 {
+			continue
+		}
+		pod.Containers[i] = podmantypes.PodInspectContainer{
+			ID:       member.ID,
+			Name:     member.Name,
+			State:    member.State,
+			Image:    containers[index].Image,
+			Status:   containers[index].Status,
+			Created:  containers[index].Created,
+			ExitCode: containers[index].ExitCode,
+			IsInfra:  containers[index].IsInfra,
+			Ports:    containers[index].Ports,
+		}
+	}
+	return pod, nil
 }
 
 func (s *Service) Create(ctx context.Context, req podmantypes.PodCreateRequest) (string, error) {

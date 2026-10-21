@@ -398,16 +398,12 @@ export function getSwarmNavigationItems(swarmEnabled: boolean | undefined, curre
 	return navigationItems.swarmItems.filter((item) => item.url === '/swarm/cluster');
 }
 
-const podmanListUrls = ['/podman/pods', '/podman/quadlets'];
-
-export function getPodmanNavigationItems(statuses: Record<string, PodmanStatus>, currentEnvId: string): NavigationItem[] {
+export function getPodmanNavigationItems(statuses: Record<string, PodmanStatus>): NavigationItem[] {
 	const shown = environmentStore.shown.flatMap((env) => statuses[env.id] ?? []);
 	if (shown.length === 0) return [];
-	const selected = statuses[currentEnvId];
-	return navigationItems.podmanItems.filter((item) => {
-		if (item.url === '/podman/quadlets') return shown.some((status) => status.quadletsSupported);
-		return !!selected || podmanListUrls.includes(item.url);
-	});
+	return navigationItems.podmanItems.filter(
+		(item) => item.url !== '/podman/quadlets' || shown.some((status) => status.quadletsSupported)
+	);
 }
 
 export const DEFAULT_LANDING_PAGE = '/dashboard';
@@ -450,7 +446,7 @@ export function getAvailableMobileNavItems(options?: {
 		flatItems.push(...swarmItems);
 	}
 
-	flatItems.push(...getPodmanNavigationItems(options?.podmanStatuses ?? {}, options?.currentEnvId ?? '0'));
+	flatItems.push(...getPodmanNavigationItems(options?.podmanStatuses ?? {}));
 
 	if (navigationItems.settingsItems) {
 		const settingsTopLevel = navigationItems.settingsItems.filter((item) => !item.items);

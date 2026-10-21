@@ -139,7 +139,10 @@ func (s *Service) ContainerUnitAction(ctx context.Context, containerRef string, 
 		return false, nil
 	}
 
-	unit := containers[index].Labels[podmantypes.SystemdUnitLabel]
+	unit := podmantypes.QuadletUnit(containers[index].Labels)
+	if unit == "" {
+		return false, nil
+	}
 	managed, err := s.quadletManaged(ctx, rt, unit)
 	if err != nil {
 		return true, fmt.Errorf("verify quadlet unit %s for container %s: %w", unit, containerRef, err)
@@ -151,7 +154,7 @@ func (s *Service) ContainerUnitAction(ctx context.Context, containerRef string, 
 }
 
 func (s *Service) GuardQuadletManaged(ctx context.Context, labels map[string]string) error {
-	unit := labels[podmantypes.SystemdUnitLabel]
+	unit := podmantypes.QuadletUnit(labels)
 	if unit == "" {
 		return nil
 	}

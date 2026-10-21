@@ -112,6 +112,11 @@ func (c *Client) Info(ctx context.Context) (podmantypes.Info, error) {
 	return c.doJSON[podmantypes.Info](ctx, request{method: http.MethodGet, path: "/info"})
 }
 
+type containerResponse struct {
+	podmantypes.Container
+	Ports []PodPortMapping `json:"Ports"`
+}
+
 func (c *Client) ContainerList(ctx context.Context, labels, pods []string) ([]podmantypes.Container, error) {
 	query, err := filtersQuery(url.Values{"all": {"true"}}, map[string][]string{
 		"label": labels,
@@ -121,11 +126,40 @@ func (c *Client) ContainerList(ctx context.Context, labels, pods []string) ([]po
 		return nil, err
 	}
 
-	return c.doJSON[[]podmantypes.Container](ctx, request{
+	raw, err := c.doJSON[[]containerResponse](ctx, request{
 		method: http.MethodGet,
 		path:   "/containers/json",
 		query:  query,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	containers := make([]podmantypes.Container, 0, len(raw))
+	for _, item := range raw {
+		ports := make([]podmantypes.PodPortMapping, 0, len(item.Ports))
+		for _, port := range item.Ports {
+			ports = append(ports, podmantypes.PodPortMapping(port))
+		}
+		containers = append(containers, podmantypes.Container{
+			ID:        item.ID,
+			Names:     item.Names,
+			Image:     item.Image,
+			ImageID:   item.ImageID,
+			State:     item.State,
+			Status:    item.Status,
+			Created:   item.Created,
+			StartedAt: item.StartedAt,
+			ExitCode:  item.ExitCode,
+			Exited:    item.Exited,
+			Labels:    item.Labels,
+			Pod:       item.Pod,
+			PodName:   item.PodName,
+			IsInfra:   item.IsInfra,
+			Ports:     ports,
+		})
+	}
+	return containers, nil
 }
 
 func (c *Client) doJSON[T any](ctx context.Context, req request) (T, error) {

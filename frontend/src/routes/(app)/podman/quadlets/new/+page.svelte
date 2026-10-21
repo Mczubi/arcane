@@ -1,26 +1,33 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
 
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
-	import CodePanel from '#lib/components/code-panel.svelte';
-	import SelectWithLabel from '#lib/components/form/select-with-label.svelte';
-	import TextInputWithLabel from '#lib/components/form/text-input-with-label.svelte';
+	import EnvironmentDestinationSelect from '#lib/components/form/environment-destination-select.svelte';
 	import EmptyState from '#lib/components/states/empty-state.svelte';
-	import * as Card from '#lib/components/ui/card/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Label } from '#lib/components/ui/label/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
 	import { ArrowLeftIcon, FileTextIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
+	import { queryKeys } from '#lib/query/query-keys.js';
 	import { podmanService } from '#lib/services/podman-service.js';
-	import { PODMAN_QUADLET_TYPES, type PodmanQuadletFile, type PodmanQuadletType } from '#lib/types/podman.js';
+	import { PODMAN_QUADLET_TYPES, type PodmanQuadletType } from '#lib/types/podman.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
+	import { hasPermission } from '#lib/utils/auth.js';
+	import { destinationEnvironmentId, environmentHref } from '#lib/utils/environments.js';
+	import { shownPodmanEnvironments } from '#lib/utils/podman.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
-	import QuadletExtraFiles from '../components/quadlet-extra-files.svelte';
+	import EditableName from '../../../projects/components/editable-name.svelte';
+	import QuadletWorkspaceEditor, {
+		createQuadletWorkspace,
+		quadletWorkspaceFiles
+	} from '../components/quadlet-workspace-editor.svelte';
 
 	let { data } = $props();
-
-	const status = $derived(data.podmanStatus);
-	const appsSupported = $derived(status?.quadletAppsSupported === true);
+	const queryClient = useQueryClient();
 
 	const templates: Record<PodmanQuadletType, string> = {
 		container: '[Unit]\nDescription=\n\n[Container]\nImage=\n\n[Install]\nWantedBy=default.target\n',
@@ -33,16 +40,24 @@
 		artifact: '[Artifact]\nArtifact=\n'
 	};
 
+	const podmanEnvironments = $derived(shownPodmanEnvironments(data.podmanStatuses));
+	const quadletEnvironments = $derived(shownPodmanEnvironments(data.podmanStatuses, (status) => status.quadletsSupported));
+	const installEnvironments = $derived(quadletEnvironments.filter((env) => hasPermission('podman:quadlets', env.id)));
+	let picked = $state('');
+	const environmentId = $derived(destinationEnvironmentId(picked, 'podman:quadlets', installEnvironments));
+	const status = $derived(data.podmanStatuses[environmentId]);
+	const appsSupported = $derived(status?.quadletAppsSupported === true);
+
 	let baseName = $state('');
+	let nameInputRef = $state<HTMLInputElement | null>(null);
 	let quadletType = $state<PodmanQuadletType>('container');
 	let content = $state(templates.container);
-	let kubeYaml = $state('');
 	let app = $state('');
-	let extraFiles = $state<PodmanQuadletFile[]>([]);
 	let submitting = $state(false);
+	const workspace = createQuadletWorkspace();
 
 	const fileName = $derived(`${baseName.trim()}.${quadletType}`);
-	const kubeFileName = $derived(`${baseName.trim()}.yaml`);
+	const canSubmit = $derived(!!baseName.trim() && !!content.trim() && !submitting);
 
 	function handleTypeChange(value: string) {
 		const next = value as PodmanQuadletType;
@@ -51,124 +66,156 @@
 	}
 
 	async function handleSubmit() {
-		if (!baseName.trim()) {
-			toast.error(m.common_field_required({ field: m.common_name() }));
-			return;
-		}
-		const files = [
-			...(quadletType === 'kube' && kubeYaml.trim() ? [{ name: kubeFileName, content: kubeYaml }] : []),
-			...(appsSupported ? extraFiles.filter((file) => file.name.trim()) : [])
-		];
+		const installEnvironmentId = environmentId;
+		const installFileName = fileName;
+		const extraFiles = quadletWorkspaceFiles(workspace);
 		submitting = true;
 		await handleApiResultWithCallbacks({
 			result: await tryCatch(
-				podmanService.installQuadlet({
-					name: fileName,
-					content,
-					extraFiles: files.length > 0 ? files : undefined,
-					app: appsSupported && app.trim() ? app.trim() : undefined
-				})
+				podmanService.installQuadlet(
+					{
+						name: installFileName,
+						content,
+						extraFiles: extraFiles.length > 0 ? extraFiles : undefined,
+						app: appsSupported && app.trim() ? app.trim() : undefined
+					},
+					installEnvironmentId
+				)
 			),
-			message: m.podman_quadlet_install_failed({ name: fileName }),
+			message: m.podman_quadlet_install_failed({ name: installFileName }),
 			setLoadingState: (value) => (submitting = value),
 			onSuccess: async (report) => {
 				const errors = Object.entries(report.quadletErrors ?? {});
 				if (errors.length > 0) {
-					toast.error(m.podman_quadlet_install_failed({ name: fileName }), {
+					toast.error(m.podman_quadlet_install_failed({ name: installFileName }), {
 						description: errors.map(([name, error]) => `${name}: ${error}`).join('\n')
 					});
 					return;
 				}
-				toast.success(m.podman_quadlet_install_success({ name: fileName }));
-				await goto(`/podman/quadlets/${encodeURIComponent(fileName)}`);
+				toast.success(m.podman_quadlet_install_success({ name: installFileName }));
+				await Promise.all([
+					queryClient.invalidateQueries({ queryKey: queryKeys.podman.environment(installEnvironmentId) }),
+					queryClient.invalidateQueries({ queryKey: ['podman-quadlets'] })
+				]);
+				await goto(environmentHref(`/podman/quadlets/${encodeURIComponent(installFileName)}`, installEnvironmentId));
 			}
 		});
 	}
 </script>
 
-<div class="flex min-h-0 flex-col bg-background">
-	<div class="sticky top-0 z-10 border-b bg-background">
-		<div class="mx-auto flex h-16 w-full max-w-full items-center gap-4 px-6">
-			<ArcaneButton
-				action="base"
-				tone="ghost"
-				size="sm"
-				href="/podman/quadlets"
-				class="gap-2 bg-transparent"
-				icon={ArrowLeftIcon}
-				customLabel={m.common_back()}
-			/>
-			<div class="hidden h-4 w-px bg-border sm:block"></div>
-			<h1 class="flex-1 text-base font-semibold">{m.podman_quadlet_install()}</h1>
-			{#if status?.quadletsSupported}
+{#snippet nameField(variant: 'inline' | 'block')}
+	<EditableName
+		bind:value={baseName}
+		bind:ref={nameInputRef}
+		{variant}
+		originalValue=""
+		placeholder={m.podman_quadlet_name_placeholder()}
+		canEdit={!submitting}
+		class={variant === 'inline' ? 'hidden sm:block' : undefined}
+	/>
+{/snippet}
+
+<div class="flex h-full min-h-0 flex-col bg-background">
+	<div class="sticky top-0 mb-2 border-b">
+		<div class="mx-auto flex h-16 max-w-full items-center justify-between gap-4 px-6">
+			<div class="flex items-center gap-4">
 				<ArcaneButton
-					action="create"
-					customLabel={m.podman_quadlet_install()}
-					onclick={handleSubmit}
-					loading={submitting}
-					disabled={submitting}
+					action="base"
+					tone="ghost"
+					size="sm"
+					href="/podman/quadlets"
+					class="gap-2 bg-transparent"
+					icon={ArrowLeftIcon}
+					customLabel={m.common_back()}
 				/>
+				<div class="hidden h-4 w-px bg-border sm:block"></div>
+				{#if quadletEnvironments.length > 0}
+					<div class="hidden items-center gap-3 sm:flex">
+						{@render nameField('inline')}
+					</div>
+				{:else}
+					<h1 class="text-base font-semibold">{m.podman_quadlet_install()}</h1>
+				{/if}
+			</div>
+
+			{#if quadletEnvironments.length > 0}
+				<div class="flex items-center gap-2">
+					<EnvironmentDestinationSelect
+						bind:value={() => environmentId, (value) => (picked = value)}
+						permission="podman:quadlets"
+						environments={installEnvironments}
+					/>
+					{#if installEnvironments.length > 0}
+						<ArcaneButton
+							action="create"
+							customLabel={m.podman_quadlet_install()}
+							loadingLabel={m.common_action_creating()}
+							onclick={handleSubmit}
+							loading={submitting}
+							disabled={!canSubmit}
+						/>
+					{/if}
+				</div>
 			{/if}
 		</div>
 	</div>
 
-	<div class="mx-auto w-full max-w-full space-y-6 px-6 py-6">
-		{#if !status?.quadletsSupported}
-			<EmptyState icon={FileTextIcon} title={m.common_unavailable()} description={m.podman_quadlets_unsupported()} />
-		{:else}
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>{m.common_details_title({ resource: m.podman_quadlet() })}</Card.Title>
-					<Card.Description>{m.podman_quadlet_install_description()}</Card.Description>
-				</Card.Header>
-				<Card.Content>
-					<div class="grid gap-4 md:grid-cols-2">
-						<TextInputWithLabel
-							id="quadlet-name"
-							label={m.common_name()}
-							helpText={fileName}
-							bind:value={baseName}
-							required
-							disabled={submitting}
-						/>
-						<SelectWithLabel
-							id="quadlet-type"
-							label={m.common_type()}
-							value={quadletType}
-							options={PODMAN_QUADLET_TYPES.map((type) => ({ label: `.${type}`, value: type }))}
-							onValueChange={handleTypeChange}
-							disabled={submitting}
-						/>
+	{#if quadletEnvironments.length === 0}
+		<div class="mx-auto w-full max-w-full px-6 py-6">
+			<EmptyState
+				icon={FileTextIcon}
+				title={m.common_unavailable()}
+				description={podmanEnvironments.length === 0 ? m.podman_environments_unavailable() : m.podman_quadlets_unsupported()}
+			/>
+		</div>
+	{:else}
+		<div class="flex min-h-0 flex-1 overflow-hidden">
+			<div class="mx-auto h-full w-full max-w-full min-w-0">
+				<div class="flex h-full min-h-0 flex-col gap-3">
+					<div class="block flex-shrink-0 py-4 sm:hidden">
+						{@render nameField('block')}
+					</div>
+
+					<div class="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3">
+						<div class="flex items-center gap-2">
+							<Label for="quadlet-type" weight="normal" class="shrink-0">{m.common_type()}</Label>
+							<Select.Root type="single" value={quadletType} onValueChange={handleTypeChange} disabled={submitting}>
+								<Select.Trigger id="quadlet-type" class="h-8 min-w-32">
+									<span class="truncate">.{quadletType}</span>
+								</Select.Trigger>
+								<Select.Content>
+									{#each PODMAN_QUADLET_TYPES as type (type)}
+										<Select.Item value={type}>.{type}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						</div>
 						{#if appsSupported}
-							<TextInputWithLabel
-								id="quadlet-app"
-								label={m.podman_quadlet_app()}
-								description={m.podman_quadlet_app_description()}
-								bind:value={app}
-								disabled={submitting}
-							/>
+							<div class="flex items-center gap-2">
+								<Label for="quadlet-app" weight="normal" class="shrink-0" title={m.podman_quadlet_app_description()}>
+									{m.podman_quadlet_app()}
+								</Label>
+								<Input
+									id="quadlet-app"
+									class="h-8 w-72"
+									placeholder={m.podman_quadlet_app_description()}
+									bind:value={app}
+									disabled={submitting}
+								/>
+							</div>
 						{/if}
 					</div>
-				</Card.Content>
-			</Card.Root>
 
-			<CodePanel title={fileName} language="systemd" validationMode="none" bind:value={content} autoHeight />
-
-			{#if quadletType === 'kube'}
-				<CodePanel title={kubeFileName} language="yaml" validationMode="none" bind:value={kubeYaml} autoHeight />
-			{/if}
-
-			{#if appsSupported}
-				<Card.Root>
-					<Card.Header>
-						<Card.Title>{m.podman_quadlet_extra_files()}</Card.Title>
-						<Card.Description>{m.podman_quadlet_extra_files_description()}</Card.Description>
-					</Card.Header>
-					<Card.Content>
-						<QuadletExtraFiles bind:files={extraFiles} disabled={submitting} />
-					</Card.Content>
-				</Card.Root>
-			{/if}
-		{/if}
-	</div>
+					<QuadletWorkspaceEditor
+						{workspace}
+						mainFileName={fileName}
+						bind:content
+						fileId="podman:quadlets:new"
+						{environmentId}
+						disabled={submitting}
+					/>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>

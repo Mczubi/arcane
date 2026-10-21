@@ -53,8 +53,8 @@ class PodmanService extends BaseAPIService {
 		return this.handleResponse(this.api.get(`/environments/${envId}/podman/info`, config));
 	}
 
-	async runAutoUpdate(options: PodmanAutoUpdateOptions = {}): Promise<PodmanAutoUpdateResult> {
-		const envId = await this.environmentId();
+	async runAutoUpdate(options: PodmanAutoUpdateOptions = {}, environmentId?: string): Promise<PodmanAutoUpdateResult> {
+		const envId = await this.environmentId(environmentId);
 		return this.handleResponse(this.api.post(`/environments/${envId}/podman/autoupdate`, options));
 	}
 
@@ -133,8 +133,8 @@ class PodmanService extends BaseAPIService {
 		return this.handleResponse(this.api.get(`/environments/${envId}/podman/quadlets/${encodeURIComponent(name)}/file`));
 	}
 
-	async installQuadlet(request: PodmanQuadletInstallRequest): Promise<PodmanQuadletInstallReport> {
-		const envId = await this.environmentId();
+	async installQuadlet(request: PodmanQuadletInstallRequest, environmentId?: string): Promise<PodmanQuadletInstallReport> {
+		const envId = await this.environmentId(environmentId);
 		return this.handleResponse(this.api.post(`/environments/${envId}/podman/quadlets`, request));
 	}
 
@@ -157,8 +157,8 @@ class PodmanService extends BaseAPIService {
 		return this.handleResponse(this.api.post(`/environments/${envId}/podman/quadlets/${encodeURIComponent(name)}/${action}`, {}));
 	}
 
-	async kubePlay(request: PodmanKubePlayRequest): Promise<PodmanKubePlayReport> {
-		const envId = await this.environmentId();
+	async kubePlay(request: PodmanKubePlayRequest, environmentId?: string): Promise<PodmanKubePlayReport> {
+		const envId = await this.environmentId(environmentId);
 		return this.handleResponse(this.api.post(`/environments/${envId}/podman/kube/play`, request));
 	}
 
@@ -167,8 +167,8 @@ class PodmanService extends BaseAPIService {
 		return this.handleResponse(this.api.post(`/environments/${envId}/podman/kube/down`, request));
 	}
 
-	async kubeGenerate(request: PodmanKubeGenerateRequest): Promise<PodmanKubeGenerateResponse> {
-		const envId = await this.environmentId();
+	async kubeGenerate(request: PodmanKubeGenerateRequest, environmentId?: string): Promise<PodmanKubeGenerateResponse> {
+		const envId = await this.environmentId(environmentId);
 		return this.handleResponse(this.api.post(`/environments/${envId}/podman/kube/generate`, request));
 	}
 

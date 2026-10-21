@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	podmantypes "github.com/getarcaneapp/arcane/types/v2/podman"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -103,7 +104,24 @@ func TestClientPodListAndInspect(t *testing.T) {
 		case "/v4.0.0/libpod/pods/web/json":
 			_, _ = w.Write([]byte(`{
 				"Id":"pod123","Name":"web","State":"Running","InfraContainerID":"infra1","NumContainers":2,
-				"SharedNamespaces":["net","ipc"],"Containers":[{"Id":"abc","Name":"web-app","State":"running"}]
+				"SharedNamespaces":["net","ipc"],"Containers":[{"Id":"abc","Name":"web-app","State":"running"}],
+				"CreateCommand":["podman","pod","create"],"ExitPolicy":"continue","RestartPolicy":"always",
+				"CreateCgroup":true,"CgroupParent":"machine.slice","CgroupPath":"machine.slice/pod.slice",
+				"cpu_period":100000,"cpu_quota":50000,"cpu_shares":512,"cpuset_cpus":"0-1","cpuset_mems":"0",
+				"memory_limit":536870912,"memory_swap":1073741824,"blkio_weight":300,
+				"blkio_weight_device":[{"Path":"/dev/sda","Weight":200}],
+				"device_read_bps":[{"Path":"/dev/sda","Rate":1048576}],
+				"device_write_bps":[{"Path":"/dev/sdb","Rate":2097152}],
+				"mounts":[{"Type":"bind","Source":"/srv","Destination":"/data","Options":["rbind"],"RW":true,"Propagation":"rprivate","SubPath":"sub"}],
+				"devices":[{"PathOnHost":"/dev/fuse","PathInContainer":"/dev/fuse","CgroupPermissions":"rwm"}],
+				"volumes_from":["seed:ro"],"security_opt":["label=disable"],
+				"InfraConfig":{
+					"PortBindings":{"80/tcp":[{"HostIp":"","HostPort":"8080"}]},"HostNetwork":false,
+					"StaticIP":"10.88.0.5","StaticMAC":"aa:bb:cc:dd:ee:ff","NoManageResolvConf":true,
+					"DNSServer":["1.1.1.1"],"DNSSearch":["lan"],"DNSOption":["ndots:2"],"NoManageHostname":true,
+					"NoManageHosts":true,"HostAdd":["db:10.0.0.2"],"HostsFile":"/etc/hosts.base","Networks":["frontend"],
+					"NetworkOptions":{"pasta":["-T","8080"]},"pid_ns":"host","userns":"keep-id","uts_ns":"private"
+				}
 			}`))
 		default:
 			http.NotFound(w, r)
@@ -122,4 +140,59 @@ func TestClientPodListAndInspect(t *testing.T) {
 	assert.Equal(t, "infra1", pod.InfraContainerID)
 	assert.Equal(t, uint(2), pod.NumContainers)
 	assert.Equal(t, []string{"net", "ipc"}, pod.SharedNamespaces)
+	assert.Equal(t, []string{"podman", "pod", "create"}, pod.CreateCommand)
+	assert.Equal(t, "continue", pod.ExitPolicy)
+	assert.Equal(t, "always", pod.RestartPolicy)
+	assert.True(t, pod.CreateCgroup)
+	assert.Equal(t, "machine.slice", pod.CgroupParent)
+	assert.Equal(t, "machine.slice/pod.slice", pod.CgroupPath)
+	assert.Equal(t, uint64(100000), pod.CPUPeriod)
+	assert.Equal(t, int64(50000), pod.CPUQuota)
+	assert.Equal(t, uint64(512), pod.CPUShares)
+	assert.Equal(t, "0-1", pod.CPUSetCPUs)
+	assert.Equal(t, "0", pod.CPUSetMems)
+	assert.Equal(t, uint64(536870912), pod.MemoryLimit)
+	assert.Equal(t, uint64(1073741824), pod.MemorySwap)
+	assert.Equal(t, uint64(300), pod.BlkioWeight)
+	assert.Equal(t, []podmantypes.PodWeightDevice{{Path: "/dev/sda", Weight: 200}}, pod.BlkioWeightDevices)
+	assert.Equal(t, []podmantypes.PodThrottleDevice{{Path: "/dev/sda", Rate: 1048576}}, pod.DeviceReadBps)
+	assert.Equal(t, []podmantypes.PodThrottleDevice{{Path: "/dev/sdb", Rate: 2097152}}, pod.DeviceWriteBps)
+	assert.Equal(t, []podmantypes.PodMount{
+		{
+			Type:        "bind",
+			Source:      "/srv",
+			Destination: "/data",
+			Options:     []string{"rbind"},
+			RW:          true,
+			Propagation: "rprivate",
+			SubPath:     "sub",
+		},
+	}, pod.Mounts)
+	assert.Equal(t, []podmantypes.PodDevice{
+		{
+			PathOnHost:        "/dev/fuse",
+			PathInContainer:   "/dev/fuse",
+			CgroupPermissions: "rwm",
+		},
+	}, pod.Devices)
+	assert.Equal(t, []string{"seed:ro"}, pod.VolumesFrom)
+	assert.Equal(t, []string{"label=disable"}, pod.SecurityOpts)
+	assert.Equal(t, &podmantypes.PodInfraConfig{
+		PortBindings:       map[string][]podmantypes.PodPortBinding{"80/tcp": {{HostPort: "8080"}}},
+		StaticIP:           "10.88.0.5",
+		StaticMAC:          "aa:bb:cc:dd:ee:ff",
+		NoManageResolvConf: true,
+		DNSServer:          []string{"1.1.1.1"},
+		DNSSearch:          []string{"lan"},
+		DNSOption:          []string{"ndots:2"},
+		NoManageHostname:   true,
+		NoManageHosts:      true,
+		HostAdd:            []string{"db:10.0.0.2"},
+		HostsFile:          "/etc/hosts.base",
+		Networks:           []string{"frontend"},
+		NetworkOptions:     map[string][]string{"pasta": {"-T", "8080"}},
+		PidNS:              "host",
+		UserNS:             "keep-id",
+		UtsNS:              "private",
+	}, pod.InfraConfig)
 }
