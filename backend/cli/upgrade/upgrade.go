@@ -490,7 +490,7 @@ func UpgradeContainer(ctx context.Context, dockerClient *client.Client, oldConta
 
 	config.Labels = refreshRecreatedContainerLabelsInternal(ctx, dockerClient, config.Labels, oldContainer.Image, cmp.Or(expectedImageID, newImage))
 
-	hostConfig, sanitizedMemorySwappiness, engineInfo, err := compat.PrepareRecreateHostConfigForEngine(ctx, dockerClient, oldContainer.HostConfig)
+	hostConfig, sanitizedMemorySwappiness, engineInfo, err := compat.PrepareRecreateHostConfigForEngine(ctx, dockerClient, oldContainer.ID, oldContainer.HostConfig)
 	if err != nil {
 		return fmt.Errorf("prepare host config: %w", err)
 	}

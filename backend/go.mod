@@ -69,13 +69,13 @@ require (
 	go.getarcane.app/acfs v0.6.3
 	go.getarcane.app/builds v0.4.6
 	go.getarcane.app/docker v0.1.2
-	go.getarcane.app/docker/compat v0.1.5
+	go.getarcane.app/docker/compat v0.1.6
 	go.getarcane.app/docker/convert v0.3.6
 	go.getarcane.app/kit v0.4.2
 	go.getarcane.app/streams v0.4.6
 	go.getarcane.app/sys/cgroup v0.2.5
 	go.getarcane.app/sys/crypto v0.3.2
-	go.getarcane.app/updater v0.11.10
+	go.getarcane.app/updater v0.11.11
 	go.opentelemetry.io/contrib/bridges/otelslog v0.21.0
 	go.opentelemetry.io/contrib/exporters/autoexport v0.72.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
