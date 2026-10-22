@@ -28,8 +28,8 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/theupdateframework/go-tuf/v2 v2.4.2
 	go.getarcane.app/acfs v0.6.3
-	go.getarcane.app/builds v0.4.6
-	go.getarcane.app/docker v0.1.2
+	go.getarcane.app/builds v0.4.7
+	go.getarcane.app/docker v0.1.3
 	go.getarcane.app/kit v0.4.2
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	google.golang.org/protobuf v1.36.12
@@ -48,6 +48,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.47.3 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.33.9 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.9 // indirect
+	github.com/aws/smithy-go v1.28.6 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
@@ -59,7 +60,7 @@ require (
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
-	github.com/compose-spec/compose-go/v2 v2.16.1 // indirect
+	github.com/compose-spec/compose-go/v2 v2.16.2 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467 // indirect

@@ -80,8 +80,8 @@ github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.4 h1:j6c+HA4AoS0EBEjArPjavFEB
 github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.4/go.mod h1:RhghaXUk9q66VtOQUX1FdPddQuHnqQZzbB0fEYXmPRA=
 github.com/aws/aws-sdk-go-v2/service/sts v1.51.4 h1:OKEfbf2tcfsF2pBk/S9QqNpo6alaAtiBs4hysCsBjPw=
 github.com/aws/aws-sdk-go-v2/service/sts v1.51.4/go.mod h1:mCd6qGo9b8hTtfjgsmNkFlzwjyce4owd7HDVFnCLXhM=
-github.com/aws/smithy-go v1.28.5 h1:OqbqKtzY9NUnr2yAe9+hiTdFb20tNaK/lI0PMOGXX9k=
-github.com/aws/smithy-go v1.28.5/go.mod h1:YE2RhdIuDbA5E5bTdciG9KrW3+TiEONeUWCqxX9i1Fc=
+github.com/aws/smithy-go v1.28.6 h1:Pj+/sUviNYjow8ELRtNwKHZ9ECeF+7pATX3+shjLIrw=
+github.com/aws/smithy-go v1.28.6/go.mod h1:YE2RhdIuDbA5E5bTdciG9KrW3+TiEONeUWCqxX9i1Fc=
 github.com/aymanbagabas/go-udiff v0.4.1 h1:OEIrQ8maEeDBXQDoGCbbTTXYJMYRCRO1fnodZ12Gv5o=
 github.com/aymanbagabas/go-udiff v0.4.1/go.mod h1:0L9PGwj20lrtmEMeyw4WKJ/TMyDtvAoK9bf2u/mNo3w=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
@@ -118,8 +118,8 @@ github.com/clipperhouse/uax29/v2 v2.7.0 h1:+gs4oBZ2gPfVrKPthwbMzWZDaAFPGYK72F0NJ
 github.com/clipperhouse/uax29/v2 v2.7.0/go.mod h1:EFJ2TJMRUaplDxHKj1qAEhCtQPW2tJSwu5BF98AuoVM=
 github.com/codahale/rfc6979 v0.0.0-20141003034818-6a90f24967eb h1:EDmT6Q9Zs+SbUoc7Ik9EfrFqcylYqgPZ9ANSbTAntnE=
 github.com/codahale/rfc6979 v0.0.0-20141003034818-6a90f24967eb/go.mod h1:ZjrT6AXHbDs86ZSdt/osfBi5qfexBrKUdONk989Wnk4=
-github.com/compose-spec/compose-go/v2 v2.16.1 h1:xuEQu32ghB2AK023Beumm//K8bz8u1AHC9P0zKp8jlw=
-github.com/compose-spec/compose-go/v2 v2.16.1/go.mod h1:Q1+qtN4vhzEjGrnqRtzx1xa8raDZQlMUe3WJxndYNiQ=
+github.com/compose-spec/compose-go/v2 v2.16.2 h1:pTp1DqQwJzFd85GzlWsSszKA1ABrV/ySqsClujIcWA8=
+github.com/compose-spec/compose-go/v2 v2.16.2/go.mod h1:Q1+qtN4vhzEjGrnqRtzx1xa8raDZQlMUe3WJxndYNiQ=
 github.com/containerd/errdefs v1.0.0 h1:tg5yIfIlQIrxYtu9ajqY42W3lpS19XqdxRQeEwYG8PI=
 github.com/containerd/errdefs v1.0.0/go.mod h1:+YBYIdtsnF4Iw6nWZhJcqGSg/dwvV7tyJ/kCkyJ2k+M=
 github.com/containerd/errdefs/pkg v0.3.0 h1:9IKJ06FvyNlexW690DXuQNx2KA2cUJXx151Xdx3ZPPE=
@@ -405,10 +405,10 @@ github.com/zalando/go-keyring v0.2.6 h1:r7Yc3+H+Ux0+M72zacZoItR3UDxeWfKTcabvkI8u
 github.com/zalando/go-keyring v0.2.6/go.mod h1:2TCrxYrbUNYfNS/Kgy/LSrkSQzZ5UPVH85RwfczwvcI=
 go.getarcane.app/acfs v0.6.3 h1:Q/BsumKa6vOsnCl2h9B4DUW67PBSYPhhGctMynZk2Es=
 go.getarcane.app/acfs v0.6.3/go.mod h1:+Gj2tLSyf15Y4vewy9ERYlGtYcK6wy0IwKfR6ilFApQ=
-go.getarcane.app/builds v0.4.6 h1:jfIUSYrKAfQ7zmpQH5Ow1J8FDD2pllHq/MHpD7C05Ao=
-go.getarcane.app/builds v0.4.6/go.mod h1:s92os4sYsu5A/a9t1FwhqhKvnVAXGC370k1ulxFFPqY=
-go.getarcane.app/docker v0.1.2 h1:wW0hoLdRV8LkaCiAAxFbIGulK+59w8rB5Cp67II0fDo=
-go.getarcane.app/docker v0.1.2/go.mod h1:iwZB5gwLtEvMVDaTr83yuHbBH5QGbpS5qFK5bR7aPEA=
+go.getarcane.app/builds v0.4.7 h1:mXe6UkUUa2teezZHEy7+783PDhS6qYD+qwIkg71ssr0=
+go.getarcane.app/builds v0.4.7/go.mod h1:GZlnUTeyOaw5QOfiSb3hfMHIX8jjez3x+i9tEq4FYis=
+go.getarcane.app/docker v0.1.3 h1:GEuOV4LOUCcgq9NZ5i4vvckvBuXDvH/fjqi7MCiUq9s=
+go.getarcane.app/docker v0.1.3/go.mod h1:iwZB5gwLtEvMVDaTr83yuHbBH5QGbpS5qFK5bR7aPEA=
 go.getarcane.app/kit v0.4.2 h1:9icwn+TKndqJOkwajzBGD6Fa+nKGt+qEUAClppLQoCE=
 go.getarcane.app/kit v0.4.2/go.mod h1:8mwoqd7J3vV2FzAZyBdMQ8y0qVTGIebmGxMHHsg2Mg0=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=

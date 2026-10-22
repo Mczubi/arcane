@@ -3,12 +3,12 @@ module github.com/getarcaneapp/arcane/types/v2
 go 1.27.3
 
 require (
-	github.com/compose-spec/compose-go/v2 v2.16.1
+	github.com/compose-spec/compose-go/v2 v2.16.2
 	github.com/docker/go-units v0.5.0
 	github.com/moby/moby/api v1.56.1
 	github.com/moby/moby/client v0.6.2
 	github.com/stretchr/testify v1.12.1
-	go.getarcane.app/builds v0.4.6
+	go.getarcane.app/builds v0.4.7
 )
 
 require (
