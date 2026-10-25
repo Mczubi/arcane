@@ -10,6 +10,7 @@
 - resolve orphaned job run activities on startup ([\#4572](https://github.com/getarcaneapp/arcane/pull/4572) by @kmendell)
 
 **Full Changelog**: https://github.com/getarcaneapp/arcane/compare/v2.17.0...v2.17.1
+
 ## v2.17.0
 
 ### New features

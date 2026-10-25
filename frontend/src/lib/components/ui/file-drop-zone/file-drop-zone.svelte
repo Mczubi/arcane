@@ -115,6 +115,17 @@
 		uploading = false;
 	};
 
+	// Safari's picker greys out files for multi-dot extensions like `.tar.gz`, so the hint uses
+	// only the last segment while `shouldAcceptFile` still validates the full pattern.
+	const pickerAccept = $derived.by(() => {
+		if (!accept) return accept;
+		const patterns = accept.split(',').map((pattern) => {
+			const trimmed = pattern.trim();
+			return trimmed.startsWith('.') ? trimmed.slice(trimmed.lastIndexOf('.')) : trimmed;
+		});
+		return [...new Set(patterns)].join(',');
+	});
+
 	const canUploadFiles = $derived(
 		!disabled && !uploading && !(maxFiles !== undefined && fileCount !== undefined && fileCount >= maxFiles)
 	);
@@ -161,7 +172,7 @@
 		{...rest}
 		disabled={!canUploadFiles}
 		{id}
-		{accept}
+		accept={pickerAccept}
 		multiple={multiple ?? (maxFiles === undefined || maxFiles - (fileCount ?? 0) > 1)}
 		type="file"
 		onchange={change}
