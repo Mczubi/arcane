@@ -1,3 +1,15 @@
+## v2.17.1
+
+### Bug fixes
+
+- require saved job enablement before manual runs ([\#4550](https://github.com/getarcaneapp/arcane/pull/4550) by @grootbro)
+- trust Arcane's CA roots inside the Rustic container ([\#4554](https://github.com/getarcaneapp/arcane/pull/4554) by @Mczubi)
+- ignore project name when compose file sets name ([\#4561](https://github.com/getarcaneapp/arcane/pull/4561) by @kmendell)
+- use mount-time environment and volume in workspace cache listener ([\#4563](https://github.com/getarcaneapp/arcane/pull/4563) by @kmendell)
+- ignore update opt-outs for manual updater runs ([\#4564](https://github.com/getarcaneapp/arcane/pull/4564) by @kmendell)
+- resolve orphaned job run activities on startup ([\#4572](https://github.com/getarcaneapp/arcane/pull/4572) by @kmendell)
+
+**Full Changelog**: https://github.com/getarcaneapp/arcane/compare/v2.17.0...v2.17.1
 ## v2.17.0
 
 ### New features
